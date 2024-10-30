@@ -1,0 +1,133 @@
+-- Drop table if it exists
+DROP TABLE IF EXISTS competitor;
+
+-- Create table competitor
+CREATE TABLE IF NOT EXISTS competitor(
+    customerID TEXT PRIMARY KEY,
+	gender TEXT,
+	SeniorCitizen INT,	
+	Partner TEXT,
+	Dependents TEXT,
+	tenure INT,
+	PhoneService TEXT,
+	MultipleLines TEXT,
+	InternetService TEXT,
+	OnlineSecurity TEXT,
+	OnlineBackup TEXT,	
+	DeviceProtection TEXT,	
+	TechSupport TEXT,	
+	StreamingTV TEXT,	
+	StreamingMovies TEXT,	
+	Contract TEXT,	
+	PaperlessBilling TEXT,	
+	PaymentMethod TEXT,	
+	MonthlyCharges NUMERIC,	
+	TotalCharges TEXT,
+	Churn TEXT
+);
+
+-- Import data from CSV
+COPY competitor
+FROM 'C:\Users\Public\Documents\WA_Fn-UseC_-Telco-Customer-Churn.csv'
+DELIMITER ','
+CSV HEADER;
+
+-- Update contract_id and payment_id based on their string values
+UPDATE competitor
+SET contract =
+  CASE 
+    WHEN competitor.contract = 'Month-to-month' THEN '1'
+    WHEN competitor.contract IN ('1 year', 'One year') THEN '2'
+    WHEN competitor.contract = 'Two year' THEN '3'
+    ELSE competitor.contract
+  END,
+paymentmethod =
+  CASE 
+    WHEN competitor.paymentmethod = 'Bank transfer (automatic)' THEN '1'
+    WHEN competitor.paymentmethod = 'Credit card (automatic)' THEN '2'
+    WHEN competitor.paymentmethod = 'Electronic check' THEN '3'
+    WHEN competitor.paymentmethod = 'Mailed check' THEN '4'
+    ELSE competitor.paymentmethod
+  END;
+
+-- Rename columns for consistency
+ALTER TABLE competitor
+RENAME COLUMN SeniorCitizen TO senior_citizen;
+ALTER TABLE competitor
+RENAME COLUMN partner TO married;
+ALTER TABLE competitor
+RENAME COLUMN PhoneService TO phone;
+ALTER TABLE competitor
+RENAME COLUMN MultipleLines TO multiple_lines;
+ALTER TABLE competitor
+RENAME COLUMN InternetService TO internet_service;
+ALTER TABLE competitor
+RENAME COLUMN OnlineSecurity TO online_security;
+ALTER TABLE competitor
+RENAME COLUMN OnlineBackup TO online_backup;
+ALTER TABLE competitor
+RENAME COLUMN DeviceProtection TO device_protection;
+ALTER TABLE competitor
+RENAME COLUMN TechSupport TO tech_support;
+ALTER TABLE competitor
+RENAME COLUMN StreamingTV TO streaming_tv;
+ALTER TABLE competitor
+RENAME COLUMN StreamingMovies TO streaming_movies;
+ALTER TABLE competitor
+RENAME COLUMN Contract TO contract_id;
+ALTER TABLE competitor
+RENAME COLUMN Customerid TO customer_id;
+ALTER TABLE competitor
+RENAME COLUMN PaperlessBilling TO paperless_billing;
+ALTER TABLE competitor
+RENAME COLUMN PaymentMethod TO payment_id;
+ALTER TABLE competitor
+RENAME COLUMN MonthlyCharges TO monthly_charge;
+ALTER TABLE competitor
+RENAME COLUMN TotalCharges TO total_charge;
+
+-- Add company column with default value
+ALTER TABLE competitor
+ADD COLUMN company BOOLEAN DEFAULT false;
+
+-- Add company column to customer table with default true
+ALTER TABLE customer
+ADD COLUMN company BOOLEAN DEFAULT true;
+
+-- Convert contract_id and payment_id columns to numeric
+ALTER TABLE competitor
+ALTER COLUMN contract_id TYPE NUMERIC
+USING contract_id::NUMERIC;
+
+ALTER TABLE competitor
+ALTER COLUMN payment_id TYPE NUMERIC
+USING payment_id::NUMERIC;
+
+-- Create combined_df table with data from customer and competitor tables
+CREATE TABLE combined_df AS
+SELECT 
+    customer_id, 
+    gender, 
+    churn, 
+    round(tenure) AS round_tenure, 
+    monthly_charge, 
+    payment_id, 
+    contract_id,
+    company
+FROM customer
+
+UNION ALL 
+
+SELECT 
+    customer_id, 
+    gender, 
+    churn, 
+    round(tenure) AS round_tenure, 
+    monthly_charge, 
+    payment_id, 
+    contract_id,
+    company
+FROM competitor;
+
+-- Update company field in customer table
+UPDATE customer SET company = true;
