@@ -58,7 +58,7 @@ resource "docker_container" "service" {
   command  = each.value.command
   networks_advanced { name = docker_network.fraud_detector.name }
   env = [
-    "AUDIT_SERVICE_URL=http://fraud-detector-${var.environment}-audit_store:8001",
+    "AUDIT_SERVICE_URL=http://fraud-detector-${var.environment}-${replace("audit_store", "_", "-")}:8001",
     "TRAFFIC_TARGET_URL=http://fraud-detector-${var.environment}-api:8000",
     "SQLITE_PATH=/var/lib/fraud-detector/audit.db",
   ]

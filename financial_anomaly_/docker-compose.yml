@@ -63,6 +63,8 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
       GF_DASHBOARDS_JSON_ENABLED: "true"
+      GF_DISABLE_LOGIN_FORM: "true"
+      GF_DASHBOARDS_JSON_PATH: /var/lib/grafana/dashboards
     image: grafana/grafana:11.3.1
     ports:
       - "3000:3000"
