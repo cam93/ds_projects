@@ -53,6 +53,10 @@ Terraform provisions exactly five containers:
 4. To provision the same five-container topology with Terraform:
    `cd infra/terraform/environments/dev && terraform init && terraform apply`.
 
+The Compose project name and locally built image tags are explicitly pinned, so
+the stack can also be run from directories whose names contain underscores or
+trailing separators.
+
 The initial tree is intentionally scaffolded so model architecture, event
 transport, persistence, and cloud-provider-specific Terraform can be added
 without moving public interfaces.
