@@ -1,0 +1,25 @@
+{
+  "title": "Realtime Fraud Detector",
+  "panels": [
+    {
+      "title": "Predictions per second",
+      "type": "timeseries",
+      "targets": [{"expr": "rate(fraud_predictions_total[1m])"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+    },
+    {
+      "title": "Fraud decisions",
+      "type": "timeseries",
+      "targets": [{"expr": "fraud_predictions_total", "legendFormat": "{{decision}}"}],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+    },
+    {
+      "title": "Prediction latency",
+      "type": "timeseries",
+      "targets": [{"expr": "histogram_quantile(0.95, rate(fraud_prediction_latency_seconds_bucket[5m]))"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

@@ -1,1 +1,0 @@
-"""Streaming transaction processor application."""

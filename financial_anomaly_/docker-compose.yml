@@ -1,45 +1,47 @@
 services:
+  traffic-generator:
+    build:
+      context: .
+      dockerfile: deploy/docker/traffic-generator.Dockerfile
+    environment:
+      TRAFFIC_TARGET_URL: http://api:8000
+      TRAFFIC_INTERVAL_SECONDS: 0.25
+    depends_on:
+      api:
+        condition: service_healthy
+
   api:
     build:
       context: .
       dockerfile: deploy/docker/api.Dockerfile
-    env_file: .env
+    environment:
+      AUDIT_SERVICE_URL: http://audit-store:8001
     ports:
       - "8000:8000"
     depends_on:
-      - redis
-      - kafka
+      audit-store:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
-  stream-processor:
+  audit-store:
     build:
       context: .
-      dockerfile: deploy/docker/stream-processor.Dockerfile
-    env_file: .env
-    depends_on:
-      - kafka
-      - redis
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-  zookeeper:
-    image: bitnami/zookeeper:3.9
+      dockerfile: deploy/docker/audit-store.Dockerfile
     environment:
-      ALLOW_ANONYMOUS_LOGIN: "yes"
-
-  kafka:
-    image: bitnami/kafka:3.9
+      SQLITE_PATH: /var/lib/fraud-detector/audit.db
+    volumes:
+      - audit-data:/var/lib/fraud-detector
     ports:
-      - "9092:9092"
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      ALLOW_PLAINTEXT_LISTENER: "yes"
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   prometheus:
     image: prom/prometheus:v2.55.1
@@ -47,10 +49,19 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      api:
+        condition: service_healthy
 
   grafana:
     image: grafana/grafana:11.3.1
     ports:
       - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+
+volumes:
+  audit-data:

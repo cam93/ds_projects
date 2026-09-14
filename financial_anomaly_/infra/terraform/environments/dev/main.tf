@@ -3,6 +3,7 @@ terraform {
 }
 
 module "fraud_detector" {
-  source      = "../../modules/fraud_detector"
-  environment = "dev"
+  source       = "../../modules/fraud_detector"
+  environment  = "dev"
+  project_root = "../../../../"
 }

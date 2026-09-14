@@ -5,9 +5,8 @@ description = "Realtime financial transaction fraud detection platform"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115,<1",
-    "kafka-python>=2.0,<3",
     "prometheus-client>=0.21,<1",
-    "pydantic-settings>=2.6,<3",
+    "pydantic>=2.9,<3",
     "torch>=2.5,<3",
     "uvicorn[standard]>=0.32,<1",
 ]
