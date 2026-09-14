@@ -9,9 +9,9 @@ class FraudScorer:
     """Deterministic baseline scorer with a PyTorch inference boundary."""
 
     def __init__(self) -> None:
-        self.model = torch.nn.Sequential(torch.nn.Linear(4, 1), torch.nn.Sigmoid())
+        self.model = torch.nn.Sequential(torch.nn.Linear(3, 1), torch.nn.Sigmoid())
         with torch.no_grad():
-            self.model[0].weight.copy_(torch.tensor([[1.2, -0.4, 0.08, 0.9]]))
+            self.model[0].weight.copy_(torch.tensor([[1.2, 0.08, -0.04]]))
             self.model[0].bias.fill_(-1.0)
         self.model.eval()
 
@@ -19,9 +19,8 @@ class FraudScorer:
     def _scale(transaction: Transaction) -> torch.Tensor:
         values = [
             transaction.amount / 1000.0,
-            transaction.account_age_days / 365.0,
             transaction.transactions_last_hour / 10.0,
-            float(transaction.is_international),
+            transaction.customer_history_days / 365.0,
         ]
         return torch.tensor([values], dtype=torch.float32)
 

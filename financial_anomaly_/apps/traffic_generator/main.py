@@ -13,10 +13,11 @@ from uuid import uuid4
 def build_transaction() -> dict[str, object]:
     return {
         "transaction_id": str(uuid4()),
+        "customer_id": str(random.randint(1, 5000)),
+        "terminal_id": str(random.randint(1, 10000)),
         "amount": round(random.uniform(2.0, 2500.0), 2),
-        "account_age_days": random.randint(1, 3650),
         "transactions_last_hour": random.randint(0, 20),
-        "is_international": random.choice([False, False, False, True]),
+        "customer_history_days": random.randint(1, 3650),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

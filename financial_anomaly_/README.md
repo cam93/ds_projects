@@ -67,13 +67,25 @@ ID. It writes three deterministic artifacts:
 
 ```bash
 .venv/bin/python scripts/prepare_dataset.py \
-  /path/to/2018-04-01.pkl \
+  data/raw/2018-04-01.pkl \
+  --output-dir data/processed
+```
+
+Multiple pickle files can be supplied together; validation and sorting are
+performed across the combined dataset:
+
+```bash
+.venv/bin/python scripts/prepare_dataset.py data/raw/*.pkl \
   --output-dir data/processed
 ```
 
 - `records.csv`: validated source records
 - `training_features.csv`: numeric training table with fraud labels
 - `replay_events.jsonl`: API-compatible events in replay order
+
+Place additional source pickle files in `data/raw/`; each file can be prepared
+with the same command and its outputs written to a separate processed
+directory.
 
 The Compose project name and locally built image tags are explicitly pinned, so
 the stack can also be run from directories whose names contain underscores or

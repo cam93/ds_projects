@@ -13,6 +13,7 @@ data/interim/*
 data/processed/*
 models/artifacts/*
 !data/raw/.gitkeep
+!data/raw/*.pkl
 !data/interim/.gitkeep
 !data/processed/.gitkeep
 !models/artifacts/.gitkeep
