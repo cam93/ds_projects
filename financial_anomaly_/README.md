@@ -56,6 +56,8 @@ Terraform provisions exactly five containers:
 Terraform resolves the project root to an absolute path for Docker bind mounts.
 The root `.dockerignore` excludes local virtual environments, Terraform state,
 and generated caches so Docker image builds remain small and reliable.
+Grafana mounts only its provisioning and dashboard directories, preserving the
+image's built-in configuration and startup paths.
 
 The Compose project name and locally built image tags are explicitly pinned, so
 the stack can also be run from directories whose names contain underscores or

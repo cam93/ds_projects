@@ -93,8 +93,13 @@ resource "docker_container" "grafana" {
   networks_advanced { name = docker_network.fraud_detector.name }
   mounts {
     type   = "bind"
-    source = "${var.project_root}/monitoring/grafana"
-    target = "/etc/grafana"
+    source = "${var.project_root}/monitoring/grafana/provisioning"
+    target = "/etc/grafana/provisioning"
+  }
+  mounts {
+    type   = "bind"
+    source = "${var.project_root}/monitoring/grafana/dashboards"
+    target = "/var/lib/grafana/dashboards"
   }
   ports {
     internal = 3000
