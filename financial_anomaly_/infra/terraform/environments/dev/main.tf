@@ -5,5 +5,5 @@ terraform {
 module "fraud_detector" {
   source       = "../../modules/fraud_detector"
   environment  = "dev"
-  project_root = "../../../../"
+  project_root = abspath("${path.root}/../../../..")
 }

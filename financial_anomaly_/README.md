@@ -53,6 +53,10 @@ Terraform provisions exactly five containers:
 4. To provision the same five-container topology with Terraform:
    `cd infra/terraform/environments/dev && terraform init && terraform apply`.
 
+Terraform resolves the project root to an absolute path for Docker bind mounts.
+The root `.dockerignore` excludes local virtual environments, Terraform state,
+and generated caches so Docker image builds remain small and reliable.
+
 The Compose project name and locally built image tags are explicitly pinned, so
 the stack can also be run from directories whose names contain underscores or
 trailing separators.
