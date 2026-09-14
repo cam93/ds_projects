@@ -59,6 +59,22 @@ and generated caches so Docker image builds remain small and reliable.
 Grafana mounts only its provisioning and dashboard directories, preserving the
 image's built-in configuration and startup paths.
 
+## Preparing the supplied dataset
+
+The ingestion pipeline reads a pandas pickle, validates required transaction
+IDs, timestamps, and positive amounts, then sorts by timestamp and transaction
+ID. It writes three deterministic artifacts:
+
+```bash
+.venv/bin/python scripts/prepare_dataset.py \
+  /path/to/2018-04-01.pkl \
+  --output-dir data/processed
+```
+
+- `records.csv`: validated source records
+- `training_features.csv`: numeric training table with fraud labels
+- `replay_events.jsonl`: API-compatible events in replay order
+
 The Compose project name and locally built image tags are explicitly pinned, so
 the stack can also be run from directories whose names contain underscores or
 trailing separators.
