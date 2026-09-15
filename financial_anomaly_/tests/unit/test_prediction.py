@@ -12,6 +12,7 @@ def test_scorer_returns_probability() -> None:
         amount=100.0,
         transactions_last_hour=2,
         customer_history_days=365,
+        hour_of_day=12,
         timestamp=datetime.now(timezone.utc),
     )
     probability = FraudScorer().predict(transaction)

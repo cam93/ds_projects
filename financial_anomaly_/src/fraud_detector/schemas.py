@@ -10,6 +10,7 @@ class Transaction(BaseModel):
     amount: float = Field(gt=0, le=1_000_000)
     transactions_last_hour: int = Field(ge=0, le=10_000)
     customer_history_days: float = Field(ge=0, le=100_000)
+    hour_of_day: int = Field(ge=0, le=23)
     timestamp: datetime
 
 

@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from fraud_detector.features.handbook import FEATURE_NAMES, FeatureState, calculate_features
+
 REQUIRED_COLUMNS = (
     "TRANSACTION_ID",
     "TX_DATETIME",
@@ -57,16 +59,14 @@ def validate_and_sort(records: pd.DataFrame) -> pd.DataFrame:
 
 def build_training_features(records: pd.DataFrame) -> pd.DataFrame:
     """Create model-ready numeric features while retaining the fraud label."""
-    customer_history_days, transactions_last_hour = build_online_features(records)
+    online_features = build_online_features(records)
     return pd.DataFrame(
         {
             "transaction_id": records["TRANSACTION_ID"],
             "timestamp": records["TX_DATETIME"].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "customer_id": records["CUSTOMER_ID"].astype("string"),
             "terminal_id": records["TERMINAL_ID"].astype("string"),
-            "amount": records["TX_AMOUNT"].astype("float64"),
-            "transactions_last_hour": transactions_last_hour,
-            "customer_history_days": customer_history_days,
+            **online_features,
             "is_fraud": pd.to_numeric(records["TX_FRAUD"], errors="raise").astype("int64"),
             "fraud_scenario": pd.to_numeric(
                 records["TX_FRAUD_SCENARIO"], errors="raise"
@@ -75,25 +75,25 @@ def build_training_features(records: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def build_online_features(records: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
-    """Calculate only features available at the time each transaction occurs."""
-    first_seen = records.groupby("CUSTOMER_ID")["TX_DATETIME"].transform("min")
-    history_days = (records["TX_DATETIME"] - first_seen).dt.total_seconds().div(86400)
-    prior_transactions = pd.Series(0, index=records.index, dtype="int64")
-    customer_windows: dict[str, list[pd.Timestamp]] = {}
+def build_online_features(records: pd.DataFrame) -> pd.DataFrame:
+    """Calculate handbook features in chronological order."""
+    state = FeatureState()
+    calculated: list[dict[str, float]] = []
     for index, row in records.iterrows():
-        customer_id = str(row["CUSTOMER_ID"])
-        timestamp = row["TX_DATETIME"]
-        window = customer_windows.setdefault(customer_id, [])
-        window[:] = [seen_at for seen_at in window if timestamp - seen_at < pd.Timedelta(hours=1)]
-        prior_transactions.at[index] = len(window)
-        window.append(timestamp)
-    return history_days.round(6), prior_transactions
+        calculated.append(
+            calculate_features(
+                customer_id=str(row["CUSTOMER_ID"]),
+                amount=float(row["TX_AMOUNT"]),
+                timestamp=row["TX_DATETIME"].to_pydatetime(),
+                state=state,
+            )
+        )
+    return pd.DataFrame(calculated, index=records.index)[FEATURE_NAMES]
 
 
 def build_replay_events(records: pd.DataFrame) -> list[dict[str, object]]:
     """Create events accepted by the realtime API in deterministic order."""
-    customer_history_days, transactions_last_hour = build_online_features(records)
+    online_features = build_online_features(records)
     events: list[dict[str, object]] = []
     for position, record in enumerate(records.itertuples(index=False)):
         timestamp = pd.Timestamp(record.TX_DATETIME).isoformat().replace("+00:00", "Z")
@@ -103,8 +103,9 @@ def build_replay_events(records: pd.DataFrame) -> list[dict[str, object]]:
                 "customer_id": str(record.CUSTOMER_ID),
                 "terminal_id": str(record.TERMINAL_ID),
                 "amount": float(record.TX_AMOUNT),
-                "transactions_last_hour": int(transactions_last_hour.iloc[position]),
-                "customer_history_days": float(customer_history_days.iloc[position]),
+                "transactions_last_hour": int(online_features.iloc[position]["transactions_last_hour"]),
+                "customer_history_days": float(online_features.iloc[position]["customer_history_days"]),
+                "hour_of_day": int(online_features.iloc[position]["hour_of_day"]),
                 "timestamp": timestamp,
             }
         )

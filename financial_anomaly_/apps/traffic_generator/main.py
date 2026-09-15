@@ -18,6 +18,7 @@ def build_transaction() -> dict[str, object]:
         "amount": round(random.uniform(2.0, 2500.0), 2),
         "transactions_last_hour": random.randint(0, 20),
         "customer_history_days": random.randint(1, 3650),
+        "hour_of_day": datetime.now(timezone.utc).hour,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

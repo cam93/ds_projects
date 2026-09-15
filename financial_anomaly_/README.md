@@ -79,6 +79,12 @@ performed across the combined dataset:
   --output-dir data/processed
 ```
 
+The shared feature handbook in
+[`src/fraud_detector/features/handbook.py`](/Users/cameron/DS_projects/ds_projects/financial_anomaly_/src/fraud_detector/features/handbook.py)
+calculates `amount`, `transactions_last_hour`, `customer_history_days`, and
+`hour_of_day` point-in-time. Customer history state is retained while multiple
+daily files are processed, so replay does not reset at a file boundary.
+
 - `records.csv`: validated source records
 - `training_features.csv`: numeric training table with fraud labels
 - `replay_events.jsonl`: API-compatible events in replay order
