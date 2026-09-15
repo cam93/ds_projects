@@ -9,6 +9,11 @@ services:
     environment:
       TRAFFIC_TARGET_URL: http://api:8000
       TRAFFIC_INTERVAL_SECONDS: 0.25
+      TRAFFIC_SOURCE: handbook
+      TRAFFIC_DATA_PATH: /data/replay.jsonl
+      TRAFFIC_REPLAY_RUN_ID: run001
+    volumes:
+      - ./data/processed/handbook:/data:ro
     depends_on:
       api:
         condition: service_healthy

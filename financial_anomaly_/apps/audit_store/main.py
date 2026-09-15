@@ -12,6 +12,7 @@ DATABASE_PATH = os.getenv("SQLITE_PATH", "audit.db")
 
 class AuditRecord(BaseModel):
     transaction_id: str
+    source_transaction_id: str | None = None
     timestamp: datetime
     fraud_probability: float = Field(ge=0, le=1)
     is_fraud: bool
@@ -30,8 +31,14 @@ def initialize_database() -> None:
                 fraud_probability REAL NOT NULL,
                 is_fraud INTEGER NOT NULL,
                 model_version TEXT NOT NULL
+                ,source_transaction_id TEXT
             )"""
         )
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(predictions)")
+        }
+        if "source_transaction_id" not in columns:
+            connection.execute("ALTER TABLE predictions ADD COLUMN source_transaction_id TEXT")
 
 
 @asynccontextmanager
@@ -53,13 +60,16 @@ def record_prediction(record: AuditRecord) -> AuditRecord:
     try:
         with sqlite3.connect(DATABASE_PATH) as connection:
             connection.execute(
-                "INSERT INTO predictions VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO predictions "
+                "(transaction_id, timestamp, fraud_probability, is_fraud, model_version, source_transaction_id) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     record.transaction_id,
                     record.timestamp.isoformat(),
                     record.fraud_probability,
                     int(record.is_fraud),
                     record.model_version,
+                    record.source_transaction_id,
                 ),
             )
     except sqlite3.IntegrityError as error:
@@ -71,17 +81,18 @@ def record_prediction(record: AuditRecord) -> AuditRecord:
 def list_predictions(limit: Annotated[int, Field(ge=1, le=100)] = 20) -> list[AuditRecord]:
     with sqlite3.connect(DATABASE_PATH) as connection:
         rows = connection.execute(
-            "SELECT transaction_id, timestamp, fraud_probability, is_fraud, model_version "
+            "SELECT transaction_id, source_transaction_id, timestamp, fraud_probability, is_fraud, model_version "
             "FROM predictions ORDER BY timestamp DESC LIMIT ?",
             (limit,),
         ).fetchall()
     return [
         AuditRecord(
             transaction_id=row[0],
-            timestamp=datetime.fromisoformat(row[1]),
-            fraud_probability=row[2],
-            is_fraud=bool(row[3]),
-            model_version=row[4],
+            source_transaction_id=row[1],
+            timestamp=datetime.fromisoformat(row[2]),
+            fraud_probability=row[3],
+            is_fraud=bool(row[4]),
+            model_version=row[5],
         )
         for row in rows
     ]

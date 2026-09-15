@@ -42,6 +42,7 @@ def predict(transaction: Transaction) -> Prediction:
     probability, is_fraud = scorer.predict(transaction)
     prediction = Prediction(
         transaction_id=transaction.transaction_id,
+        source_transaction_id=transaction.source_transaction_id,
         timestamp=transaction.timestamp,
         fraud_probability=probability,
         is_fraud=is_fraud,

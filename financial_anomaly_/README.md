@@ -59,6 +59,19 @@ and generated caches so Docker image builds remain small and reliable.
 Grafana mounts only its provisioning and dashboard directories, preserving the
 image's built-in configuration and startup paths.
 
+Before starting the Compose stack, prepare the replay file:
+
+```bash
+.venv/bin/python scripts/prepare_dataset.py data/raw/*.pkl \
+  --output-dir data/processed
+```
+
+The traffic generator runs in `handbook` mode by default, replays
+`data/processed/handbook/replay.jsonl` at four events per second, preserves
+source timestamps, and prefixes transaction IDs with the configured replay run
+ID (for example, `run001:123`). The original source ID is retained for audit
+and evaluation mapping.
+
 ## Preparing the supplied dataset
 
 The ingestion pipeline reads a pandas pickle, validates required transaction

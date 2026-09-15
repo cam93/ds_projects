@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class Transaction(BaseModel):
     transaction_id: str = Field(min_length=1, max_length=128)
+    source_transaction_id: str | None = Field(default=None, min_length=1, max_length=128)
     customer_id: str = Field(min_length=1, max_length=128)
     terminal_id: str = Field(min_length=1, max_length=128)
     amount: float = Field(gt=0, le=1_000_000)
@@ -16,6 +17,7 @@ class Transaction(BaseModel):
 
 class Prediction(BaseModel):
     transaction_id: str
+    source_transaction_id: str | None = None
     timestamp: datetime
     fraud_probability: float = Field(ge=0, le=1)
     is_fraud: bool

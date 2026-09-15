@@ -125,6 +125,12 @@ def write_outputs(records: pd.DataFrame, output_dir: Path) -> None:
     with (output_dir / "replay_events.jsonl").open("w", encoding="utf-8") as replay_file:
         for event in build_replay_events(records):
             replay_file.write(json.dumps(event, separators=(",", ":")) + "\n")
+    handbook_dir = output_dir / "handbook"
+    handbook_dir.mkdir(exist_ok=True)
+    (handbook_dir / "replay.jsonl").write_text(
+        (output_dir / "replay_events.jsonl").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
 
 
 def prepare_dataset(input_path: Path, output_dir: Path) -> pd.DataFrame:
