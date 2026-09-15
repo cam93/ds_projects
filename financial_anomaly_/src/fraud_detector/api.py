@@ -7,11 +7,11 @@ from time import perf_counter
 from fastapi import FastAPI, HTTPException
 from prometheus_client import Counter, Histogram, make_asgi_app
 
-from fraud_detector.model.inference import MODEL_VERSION, FraudScorer
+from fraud_detector.model.inference import FraudScorer
 from fraud_detector.schemas import Prediction, Transaction
 
 app = FastAPI(title="Realtime Fraud Detector", version="0.1.0")
-scorer = FraudScorer()
+scorer = None
 audit_service_url = os.getenv("AUDIT_SERVICE_URL", "http://localhost:8001")
 prediction_count = Counter("fraud_predictions_total", "Predictions by decision", ["decision"])
 prediction_latency = Histogram("fraud_prediction_latency_seconds", "Prediction latency")
@@ -26,19 +26,26 @@ def health() -> dict[str, str]:
 
 @app.get("/ready")
 def ready() -> dict[str, str]:
+    if scorer is None and not os.path.exists(
+        os.getenv("MODEL_PATH", "models/artifacts/fraud_model.pt")
+    ):
+        return {"status": "not_ready"}
     return {"status": "ready"}
 
 
 @app.post("/predict", response_model=Prediction)
 def predict(transaction: Transaction) -> Prediction:
     started = perf_counter()
-    probability = scorer.predict(transaction)
+    global scorer
+    if scorer is None:
+        scorer = FraudScorer()
+    probability, is_fraud = scorer.predict(transaction)
     prediction = Prediction(
         transaction_id=transaction.transaction_id,
         timestamp=transaction.timestamp,
         fraud_probability=probability,
-        is_fraud=probability >= 0.5,
-        model_version=MODEL_VERSION,
+        is_fraud=is_fraud,
+        model_version=scorer.model_version,
     )
     request = urllib.request.Request(
         f"{audit_service_url.rstrip('/')}/predictions",

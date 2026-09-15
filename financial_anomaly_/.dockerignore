@@ -19,6 +19,8 @@ build
 .env
 data/interim
 data/processed
-models/artifacts
+models/artifacts/*
+!models/artifacts/*.pt
+!models/artifacts/*.json
 notebooks
 tests

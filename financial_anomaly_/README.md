@@ -85,6 +85,23 @@ calculates `amount`, `transactions_last_hour`, `customer_history_days`, and
 `hour_of_day` point-in-time. Customer history state is retained while multiple
 daily files are processed, so replay does not reset at a file boundary.
 
+## Training the model
+
+Train the classifier after preparing the feature table:
+
+```bash
+.venv/bin/python scripts/train.py \
+  --input data/processed/training_features.csv \
+  --output models/artifacts/fraud_model.pt
+```
+
+Training uses chronological 70/15/15 train, validation, and test periods.
+Normalization parameters are fitted only on the training period. The exported
+artifact contains model weights, feature order, normalization parameters,
+validation-selected threshold, model version, and test metrics. The API loads
+this artifact at prediction time rather than using hard-coded weights or a
+fixed decision threshold.
+
 - `records.csv`: validated source records
 - `training_features.csv`: numeric training table with fraud labels
 - `replay_events.jsonl`: API-compatible events in replay order
