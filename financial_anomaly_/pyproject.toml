@@ -26,4 +26,7 @@ target-version = "py310"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "apps"]
+pythonpath = ["src", "apps", "scripts", "."]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"
+]

@@ -25,8 +25,11 @@ services:
       dockerfile: deploy/docker/api.Dockerfile
     environment:
       AUDIT_SERVICE_URL: http://audit-store:8001
+      MODEL_PATH: /app/models/artifacts/fraud_model.pt
     ports:
       - "8000:8000"
+    volumes:
+      - ./models/artifacts:/app/models/artifacts:ro
     depends_on:
       audit-store:
         condition: service_healthy
