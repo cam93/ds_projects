@@ -1,0 +1,207 @@
+{
+  "selected": "v2_mlp",
+  "selection": "maximize validation recall under FPR cap; break ties by precision, AP, then name",
+  "policy": {
+    "seed": 7,
+    "mlp_epochs": 30,
+    "max_false_positive_rate": 0.01,
+    "min_positive_per_split": 100,
+    "min_negative_per_split": 1000
+  },
+  "input_sha256": "b8d747fd163de83db0350d745826f0537e5d5dfa92d678269a8337b61397c754",
+  "policy_sha256": "6912c6111892d2db3dca720066ee47a723f34f56103ed4fc8d28038a17a4326f",
+  "validation": {
+    "v1_logistic": {
+      "precision": 0.3852739726027397,
+      "recall": 0.336322869955157,
+      "average_precision": 0.25994136082535235,
+      "false_positive_rate": 0.009327824979863331,
+      "true_positive": 225,
+      "false_positive": 359,
+      "false_negative": 444,
+      "true_negative": 38128,
+      "roc_auc": 0.7450828328925774,
+      "scenarios": {
+        "1": {
+          "fraud_cases": 84,
+          "detected": 24,
+          "missed": 60,
+          "recall": 0.2857142857142857
+        },
+        "2": {
+          "fraud_cases": 220,
+          "detected": 4,
+          "missed": 216,
+          "recall": 0.01818181818181818
+        },
+        "3": {
+          "fraud_cases": 365,
+          "detected": 197,
+          "missed": 168,
+          "recall": 0.5397260273972603
+        }
+      },
+      "mean_daily_precision_at_100": 0.19071428571428567
+    },
+    "v1_hist_gradient_boosting": {
+      "precision": 0.38362760834670945,
+      "recall": 0.3572496263079223,
+      "average_precision": 0.33788774294079943,
+      "false_positive_rate": 0.00997739496453348,
+      "true_positive": 239,
+      "false_positive": 384,
+      "false_negative": 430,
+      "true_negative": 38103,
+      "roc_auc": 0.760746810125897,
+      "scenarios": {
+        "1": {
+          "fraud_cases": 84,
+          "detected": 13,
+          "missed": 71,
+          "recall": 0.15476190476190477
+        },
+        "2": {
+          "fraud_cases": 220,
+          "detected": 4,
+          "missed": 216,
+          "recall": 0.01818181818181818
+        },
+        "3": {
+          "fraud_cases": 365,
+          "detected": 222,
+          "missed": 143,
+          "recall": 0.6082191780821918
+        }
+      },
+      "mean_daily_precision_at_100": 0.2007142857142857
+    },
+    "v1_mlp": {
+      "precision": 0.3875598086124402,
+      "recall": 0.3632286995515695,
+      "average_precision": 0.3033636207351973,
+      "false_positive_rate": 0.00997739496453348,
+      "true_positive": 243,
+      "false_positive": 384,
+      "false_negative": 426,
+      "true_negative": 38103,
+      "roc_auc": 0.7639128278245719,
+      "scenarios": {
+        "1": {
+          "fraud_cases": 84,
+          "detected": 22,
+          "missed": 62,
+          "recall": 0.2619047619047619
+        },
+        "2": {
+          "fraud_cases": 220,
+          "detected": 4,
+          "missed": 216,
+          "recall": 0.01818181818181818
+        },
+        "3": {
+          "fraud_cases": 365,
+          "detected": 217,
+          "missed": 148,
+          "recall": 0.5945205479452055
+        }
+      },
+      "mean_daily_precision_at_100": 0.19857142857142857
+    },
+    "v2_logistic": {
+      "precision": 0.46348314606741575,
+      "recall": 0.49327354260089684,
+      "average_precision": 0.484112688751806,
+      "false_positive_rate": 0.009925429365759866,
+      "true_positive": 330,
+      "false_positive": 382,
+      "false_negative": 339,
+      "true_negative": 38105,
+      "roc_auc": 0.814271104994861,
+      "scenarios": {
+        "1": {
+          "fraud_cases": 84,
+          "detected": 27,
+          "missed": 57,
+          "recall": 0.32142857142857145
+        },
+        "2": {
+          "fraud_cases": 220,
+          "detected": 1,
+          "missed": 219,
+          "recall": 0.004545454545454545
+        },
+        "3": {
+          "fraud_cases": 365,
+          "detected": 302,
+          "missed": 63,
+          "recall": 0.8273972602739726
+        }
+      },
+      "mean_daily_precision_at_100": 0.25142857142857145
+    },
+    "v2_hist_gradient_boosting": {
+      "precision": 0.4562410329985653,
+      "recall": 0.47533632286995514,
+      "average_precision": 0.48369649080755167,
+      "false_positive_rate": 0.009847480967599449,
+      "true_positive": 318,
+      "false_positive": 379,
+      "false_negative": 351,
+      "true_negative": 38108,
+      "roc_auc": 0.725812081908503,
+      "scenarios": {
+        "1": {
+          "fraud_cases": 84,
+          "detected": 18,
+          "missed": 66,
+          "recall": 0.21428571428571427
+        },
+        "2": {
+          "fraud_cases": 220,
+          "detected": 1,
+          "missed": 219,
+          "recall": 0.004545454545454545
+        },
+        "3": {
+          "fraud_cases": 365,
+          "detected": 299,
+          "missed": 66,
+          "recall": 0.8191780821917808
+        }
+      },
+      "mean_daily_precision_at_100": 0.24285714285714285
+    },
+    "v2_mlp": {
+      "precision": 0.4928774928774929,
+      "recall": 0.5171898355754858,
+      "average_precision": 0.5290458538831917,
+      "false_positive_rate": 0.009249876581702912,
+      "true_positive": 346,
+      "false_positive": 356,
+      "false_negative": 323,
+      "true_negative": 38131,
+      "roc_auc": 0.7910802913941823,
+      "scenarios": {
+        "1": {
+          "fraud_cases": 84,
+          "detected": 27,
+          "missed": 57,
+          "recall": 0.32142857142857145
+        },
+        "2": {
+          "fraud_cases": 220,
+          "detected": 1,
+          "missed": 219,
+          "recall": 0.004545454545454545
+        },
+        "3": {
+          "fraud_cases": 365,
+          "detected": 318,
+          "missed": 47,
+          "recall": 0.8712328767123287
+        }
+      },
+      "mean_daily_precision_at_100": 0.2692857142857143
+    }
+  }
+}

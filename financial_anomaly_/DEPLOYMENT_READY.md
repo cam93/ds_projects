@@ -10,7 +10,9 @@ release gates, replicated deployment manifests and backup configuration.
 Release blockers:
 
 - The supplied artifact has three training fraud cases and no validation/test fraud cases.
-  Production correctly rejects it. Obtain representative labeled data and pass a reviewed policy.
+  Production correctly rejects it. A new 90-day synthetic dataset now has 5,817 fraud cases;
+  its first candidate also failed evaluation and was not promoted. See `docs/SIMULATOR.md`.
+  Representative data and a reviewed passing policy remain necessary for real deployment.
 - The image security gate fails. See `reports/security/summary.json`; upstream OS and bundled Go
   package findings remain. Update/rebuild affected images and rerun the gate for every deployed
   digest, including cluster operators and gateway. No vulnerability waivers are applied.

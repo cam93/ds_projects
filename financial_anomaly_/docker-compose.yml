@@ -72,6 +72,18 @@ services:
     depends_on:
       api: {condition: service_healthy}
 
+  simulator:
+    <<: *hardening
+    restart: 'on-failure:3'
+    profiles: [simulation]
+    build: {context: ., dockerfile: deploy/docker/traffic-generator.Dockerfile}
+    command: [python, -m, fraud_detector.simulator, stream, --seed, '17', --url, 'http://api:8000', --state, /state/live.db, --api-key-file, /run/secrets/api_key]
+    secrets: [api_key]
+    volumes: [simulator-state:/state]
+    networks: [backend]
+    depends_on:
+      api: {condition: service_healthy}
+
   prometheus:
     <<: *hardening
     image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
@@ -139,6 +151,7 @@ networks:
 volumes:
   audit-data: {}
   replay-state: {}
+  simulator-state: {}
   prometheus-data: {}
   grafana-data: {}
   caddy-data: {}

@@ -11,17 +11,23 @@ variable "model_sha256" {
   default     = null
   description = "Optional explicit pin; defaults to the local artifact SHA256 for development."
 }
+variable "enable_simulator" {
+  type        = bool
+  default     = true
+  description = "Continuously generate synthetic demo traffic; explicit replay takes precedence."
+}
 variable "enable_replay" {
   type        = bool
   default     = false
   description = "Opt into finite dataset replay; the application stack starts without it."
 }
 module "fraud_detector" {
-  source        = "./infra/terraform/modules/fraud_detector"
-  environment   = "dev"
-  project_root  = abspath(path.root)
-  model_sha256  = var.model_sha256 != null ? var.model_sha256 : filesha256("${path.root}/models/artifacts/fraud_model.pt")
-  enable_replay = var.enable_replay
+  source           = "./infra/terraform/modules/fraud_detector"
+  environment      = "dev"
+  project_root     = abspath(path.root)
+  model_sha256     = var.model_sha256 != null ? var.model_sha256 : filesha256("${path.root}/models/artifacts/fraud_model.pt")
+  enable_replay    = var.enable_replay
+  enable_simulator = var.enable_simulator
 }
 output "api_url" { value = "http://localhost:8000" }
 output "grafana_url" { value = "http://localhost:3000" }

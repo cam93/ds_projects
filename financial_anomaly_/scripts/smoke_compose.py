@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import secrets
@@ -11,9 +12,15 @@ sys.path[:0] = ["src", "scripts"]
 import torch
 from train import export_artifact
 
-from fraud_detector.features.handbook import FEATURE_NAMES
+from fraud_detector.features.handbook import FEATURE_NAMES, FeatureState, calculate_features
+from fraud_detector.schemas import BehavioralFeatures, Transaction
 
 root = Path.cwd()
+parser = argparse.ArgumentParser(
+    description="Verify an isolated demo stack and remove it afterward"
+)
+parser.add_argument("--model", type=Path, help="Optional portable JSON candidate to verify")
+args = parser.parse_args()
 project = "fraud-compose-check-" + uuid.uuid4().hex[:8]
 with tempfile.TemporaryDirectory(prefix="fraud-compose-") as temp:
     d = Path(temp)
@@ -32,6 +39,12 @@ with tempfile.TemporaryDirectory(prefix="fraud-compose-") as temp:
         {},
         d / "models/fraud_model.pt",
     )
+    model_name = "fraud_model.pt"
+    if args.model:
+        if args.model.suffix != ".json":
+            parser.error("--model requires a portable .json artifact")
+        model_name = "candidate.json"
+        (d / "models" / model_name).write_bytes(args.model.read_bytes())
     event = {
         "transaction_id": "1",
         "customer_id": "1",
@@ -42,18 +55,29 @@ with tempfile.TemporaryDirectory(prefix="fraud-compose-") as temp:
         "hour_of_day": 12,
         "timestamp": "2024-01-01T12:00:00Z",
     }
+    if args.model:
+        parsed = Transaction.model_validate(event)
+        features = calculate_features(
+            customer_id=parsed.customer_id,
+            terminal_id=parsed.terminal_id,
+            amount=parsed.amount,
+            timestamp=parsed.timestamp,
+            state=FeatureState(),
+        )
+        event["behavioral_features"] = BehavioralFeatures.from_features(features).model_dump()
     (d / "data/replay.jsonl").write_text(json.dumps(event) + "\n")
     import hashlib
 
     env = {
         **os.environ,
-        "MODEL_SHA256": hashlib.sha256((d / "models/fraud_model.pt").read_bytes()).hexdigest(),
+        "MODEL_SHA256": hashlib.sha256((d / "models" / model_name).read_bytes()).hexdigest(),
     }
     override = f"""services:
   api:
     image: fraud-detector-review:local
     environment:
       APP_ENV: development
+      MODEL_PATH: /models/{model_name}
     volumes: ['{d}/models:/models:ro']
     ports: !reset []
     healthcheck:
@@ -67,6 +91,8 @@ with tempfile.TemporaryDirectory(prefix="fraud-compose-") as temp:
     image: fraud-detector-review:local
     command: [python, -m, apps.traffic_generator.main]
     volumes: ['{d}/data:/data:ro']
+  simulator:
+    image: fraud-detector-review:local
   prometheus:
     ports: !reset []
   grafana:
@@ -115,6 +141,68 @@ secrets:
             "grafana",
         )
         run("--profile", "replay", "run", "--rm", "--no-deps", "traffic-generator")
+        run(
+            "--profile",
+            "simulation",
+            "run",
+            "--rm",
+            "--no-deps",
+            "simulator",
+            "python",
+            "-m",
+            "fraud_detector.simulator",
+            "stream",
+            "--seed",
+            "17",
+            "--url",
+            "http://api:8000",
+            "--state",
+            "/state/live.db",
+            "--api-key-file",
+            "/run/secrets/api_key",
+            "--count",
+            "12",
+            "--rate",
+            "10",
+        )
+        run(
+            "--profile",
+            "simulation",
+            "run",
+            "--rm",
+            "--no-deps",
+            "simulator",
+            "python",
+            "-m",
+            "fraud_detector.simulator",
+            "stream",
+            "--seed",
+            "17",
+            "--url",
+            "http://api:8000",
+            "--state",
+            "/state/live.db",
+            "--api-key-file",
+            "/run/secrets/api_key",
+            "--count",
+            "3",
+            "--rate",
+            "10",
+        )
+        run(
+            "--profile",
+            "simulation",
+            "run",
+            "--rm",
+            "--no-deps",
+            "simulator",
+            "python",
+            "-c",
+            "import sqlite3; c=sqlite3.connect('/state/live.db'); "
+            "assert c.execute('SELECT count(*) FROM events WHERE delivered_at IS NOT NULL').fetchone()[0]==15; "
+            "assert c.execute('SELECT count(*) FROM events WHERE delivered_at IS NULL').fetchone()[0]==0; "
+            "print('Live simulator delivered and journaled 15 distinct transactions across container restarts')",
+        )
         code = """
 import httpx,time
 from pathlib import Path
@@ -142,7 +230,7 @@ with httpx.Client(timeout=5) as client:
  assert client.get('http://grafana:3000/api/admin/settings').status_code in (401,403)
  r=client.get('http://prometheus:9090/api/v1/query',params={'query':'fraud_predictions_total'})
  assert r.json()['data']['result'],r.text
- print('Authenticated metrics scraping, anonymous read-only Grafana, and dataset replay verified')
+ print('Authenticated metrics scraping, anonymous read-only Grafana, replay and live simulation verified')
 """
         print(run("exec", "-T", "api", "python", "-c", code).stdout)
         print("Isolated full Compose verification passed")

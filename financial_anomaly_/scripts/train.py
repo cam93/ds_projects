@@ -31,20 +31,22 @@ def split_by_time(records):
     )
 
 
-def fit_normalization(training):
-    values = training[FEATURE_NAMES].to_numpy(dtype=float)
+def fit_normalization(training, feature_names=None):
+    feature_names = feature_names or FEATURE_NAMES
+    values = training[feature_names].to_numpy(dtype=float)
     if not len(values) or not np.isfinite(values).all():
         raise ValueError("Training features must be non-empty and finite")
     return (
-        dict(zip(FEATURE_NAMES, values.mean(axis=0).tolist())),
-        dict(zip(FEATURE_NAMES, np.where(values.std(axis=0) > 0, values.std(axis=0), 1).tolist())),
+        dict(zip(feature_names, values.mean(axis=0).tolist())),
+        dict(zip(feature_names, np.where(values.std(axis=0) > 0, values.std(axis=0), 1).tolist())),
     )
 
 
-def as_tensor(records, means, stds):
-    values = records[FEATURE_NAMES].to_numpy(dtype=np.float32)
-    values = (values - np.array([means[n] for n in FEATURE_NAMES], dtype=np.float32)) / np.array(
-        [stds[n] for n in FEATURE_NAMES], dtype=np.float32
+def as_tensor(records, means, stds, feature_names=None):
+    feature_names = feature_names or FEATURE_NAMES
+    values = records[feature_names].to_numpy(dtype=np.float32)
+    values = (values - np.array([means[n] for n in feature_names], dtype=np.float32)) / np.array(
+        [stds[n] for n in feature_names], dtype=np.float32
     )
     return torch.from_numpy(values), torch.tensor(records.is_fraud.to_numpy(dtype=np.float32))
 
@@ -98,12 +100,17 @@ def select_threshold(labels, scores):
     return float(thresholds[int(np.argmax(f1))])
 
 
-def train_model(training, validation, means, stds, epochs):
+def train_model(
+    training, validation, means, stds, epochs, feature_names=None, seed=7, hidden_size=8
+):
+    feature_names = feature_names or FEATURE_NAMES
     if epochs < 1:
         raise ValueError("epochs must be positive")
-    torch.manual_seed(7)
-    model = nn.Sequential(nn.Linear(len(FEATURE_NAMES), 8), nn.ReLU(), nn.Linear(8, 1))
-    x, y = as_tensor(training, means, stds)
+    torch.manual_seed(seed)
+    model = nn.Sequential(
+        nn.Linear(len(feature_names), hidden_size), nn.ReLU(), nn.Linear(hidden_size, 1)
+    )
+    x, y = as_tensor(training, means, stds, feature_names)
     if not 0 < y.sum() < len(y):
         raise ValueError("Training requires both legitimate and fraudulent examples")
     loss = nn.BCEWithLogitsLoss(pos_weight=(len(y) - y.sum()) / y.sum())
@@ -111,7 +118,7 @@ def train_model(training, validation, means, stds, epochs):
         TensorDataset(x, y),
         batch_size=1024,
         shuffle=True,
-        generator=torch.Generator().manual_seed(7),
+        generator=torch.Generator().manual_seed(seed),
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     for _ in range(epochs):
@@ -120,7 +127,7 @@ def train_model(training, validation, means, stds, epochs):
             loss(model(batch_x).squeeze(1), batch_y).backward()
             optimizer.step()
     model.eval()
-    validation_x, validation_y = as_tensor(validation, means, stds)
+    validation_x, validation_y = as_tensor(validation, means, stds, feature_names)
     scores = score_batches(model, validation_x)
     labels = validation_y.to(torch.int64).tolist()
     threshold = select_threshold(labels, scores)

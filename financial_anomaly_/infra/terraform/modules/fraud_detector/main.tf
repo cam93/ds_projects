@@ -5,6 +5,10 @@ terraform {
 }
 variable "environment" { type = string }
 variable "project_root" { type = string }
+variable "enable_simulator" {
+  type    = bool
+  default = false
+}
 variable "enable_replay" {
   type    = bool
   default = false
@@ -138,6 +142,37 @@ resource "docker_container" "service" {
       retries      = 3
       start_period = "30s"
     }
+  }
+}
+resource "docker_volume" "simulator" { name = "fraud-simulator-${var.environment}" }
+resource "docker_container" "simulator" {
+  count         = var.enable_simulator && !var.enable_replay ? 1 : 0
+  name          = "fraud-${var.environment}-simulator"
+  image         = docker_image.runtime.image_id
+  command       = ["python", "-m", "fraud_detector.simulator", "stream", "--seed", "17", "--url", "http://api:8000", "--state", "/state/live.db", "--api-key-file", "/run/secrets/api_key"]
+  depends_on    = [docker_container.service]
+  user          = "10001:10001"
+  read_only     = true
+  security_opts = ["no-new-privileges:true"]
+  capabilities { drop = ["ALL"] }
+  memory          = 512
+  memory_swap     = 512
+  cpu_period      = 100000
+  cpu_quota       = 100000
+  restart         = "on-failure"
+  max_retry_count = 3
+  log_opts        = { "max-size" = "10m", "max-file" = "3" }
+  networks_advanced { name = docker_network.backend.name }
+  mounts {
+    type   = "volume"
+    source = docker_volume.simulator.name
+    target = "/state"
+  }
+  mounts {
+    type      = "bind"
+    source    = "${local.bind_root}/secrets/api_key"
+    target    = "/run/secrets/api_key"
+    read_only = true
   }
 }
 resource "docker_image" "prometheus" { name = "prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0" }

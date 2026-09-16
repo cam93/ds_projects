@@ -1,5 +1,6 @@
 """HTTP integration with a real SQLite ledger and model, without external services."""
 
+import hashlib
 import json
 import os
 
@@ -10,6 +11,9 @@ from fastapi.testclient import TestClient
 from apps.audit_store import main as audit
 from apps.traffic_generator.main import replay_transactions
 from fraud_detector import api
+from fraud_detector.features.handbook import V2_FEATURE_NAMES, FeatureState, calculate_features
+from fraud_detector.model.inference import FraudScorer
+from fraud_detector.schemas import BehavioralFeatures, Transaction
 
 
 @pytest.fixture
@@ -103,3 +107,52 @@ def test_ledger_outage_readiness_and_prediction(clients, transaction):
     predictor.app.state.audit = Unavailable()
     assert predictor.get("/ready").status_code == 503
     assert predictor.post("/predict", json=transaction).status_code == 503
+
+
+def test_legacy_hash_survives_feature_schema_upgrade(clients, transaction):
+    predictor, ledger = clients
+    assert predictor.post("/predict", json=transaction).status_code == 200
+    saved = ledger.get("/predictions/" + transaction["transaction_id"]).json()
+    legacy = Transaction.model_validate(transaction).model_dump(mode="json")
+    legacy.pop("behavioral_features")
+    expected = hashlib.sha256(
+        json.dumps(legacy, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    assert saved["request_hash"] == expected
+
+
+def test_v2_model_requires_features_and_persists_prediction(clients, tmp_path, transaction):
+    predictor, _ = clients
+    path = tmp_path / "v2.json"
+    path.write_text(
+        json.dumps(
+            {
+                "format_version": 1,
+                "feature_names": V2_FEATURE_NAMES,
+                "model_type": "logistic",
+                "means": [0] * len(V2_FEATURE_NAMES),
+                "scales": [1] * len(V2_FEATURE_NAMES),
+                "parameters": {"coefficients": [0] * len(V2_FEATURE_NAMES), "intercept": 0},
+                "threshold": 0.5,
+                "model_version": "v2-http-fixture",
+                "release": {"approved": False},
+            }
+        )
+    )
+    predictor.app.state.scorer = FraudScorer(path)
+    assert predictor.post("/predict", json=transaction).status_code == 422
+    event = Transaction.model_validate(transaction)
+    features = calculate_features(
+        customer_id=event.customer_id,
+        terminal_id=event.terminal_id,
+        amount=event.amount,
+        timestamp=event.timestamp,
+        state=FeatureState(),
+    )
+    transaction["behavioral_features"] = BehavioralFeatures.from_features(features).model_dump()
+    response = predictor.post("/predict", json=transaction)
+    assert response.status_code == 200, response.text
+    assert response.json()["model_version"] == "v2-http-fixture"
+    assert predictor.post("/predict", json=transaction).json() == response.json()
+    transaction["behavioral_features"]["terminal_mean_amount"] = 5.0
+    assert predictor.post("/predict", json=transaction).status_code == 409

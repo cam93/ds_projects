@@ -36,3 +36,6 @@ backups/
 
 reports/security/image-*.json
 deploy/kubernetes/rendered/
+
+data/simulator/
+reports/model-comparison/*-test-predictions.csv

@@ -11,8 +11,8 @@ from pathlib import Path
 import pandas as pd
 from train import split_by_time
 
-from fraud_detector.features.handbook import FEATURE_NAMES, FeatureState, calculate_features
-from fraud_detector.schemas import Transaction
+from fraud_detector.features.handbook import V2_FEATURE_NAMES, FeatureState, calculate_features
+from fraud_detector.schemas import BehavioralFeatures, Transaction
 
 REQUIRED_COLUMNS = (
     "TRANSACTION_ID",
@@ -100,12 +100,13 @@ def build_online_features(records: pd.DataFrame) -> pd.DataFrame:
         calculated.append(
             calculate_features(
                 customer_id=str(row["CUSTOMER_ID"]),
+                terminal_id=str(row["TERMINAL_ID"]),
                 amount=float(row["TX_AMOUNT"]),
                 timestamp=row["TX_DATETIME"].to_pydatetime(),
                 state=state,
             )
         )
-    return pd.DataFrame(calculated, index=records.index)[FEATURE_NAMES]
+    return pd.DataFrame(calculated, index=records.index)[V2_FEATURE_NAMES]
 
 
 def build_replay_events(records: pd.DataFrame) -> list[dict[str, object]]:
@@ -128,6 +129,9 @@ def build_replay_events(records: pd.DataFrame) -> list[dict[str, object]]:
                 ),
                 "hour_of_day": int(online_features.iloc[position]["hour_of_day"]),
                 "timestamp": timestamp,
+                "behavioral_features": BehavioralFeatures.from_features(
+                    online_features.iloc[position]
+                ).model_dump(),
             }
         )
     return events
@@ -161,6 +165,7 @@ def write_outputs(records: pd.DataFrame, output_dir: Path) -> None:
                 customer_history_days=float(row.customer_history_days),
                 hour_of_day=int(row.hour_of_day),
                 timestamp=row.timestamp,
+                behavioral_features=BehavioralFeatures.from_features(row._asdict()),
             )
             line = event.model_dump_json(exclude_none=True) + "\n"
             all_file.write(line)

@@ -1,5 +1,6 @@
 {
   "uid": "fraud-detector",
+  "description": "Synthetic demo transactions. Charts use ingestion time; transaction timestamps follow a simulated clock. Fraud decisions are predictions, not confirmed fraud.",
   "title": "Realtime Fraud Detector",
   "panels": [
     {

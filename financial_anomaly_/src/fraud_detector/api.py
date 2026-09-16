@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Request
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from starlette.responses import Response
 
-from fraud_detector.model.inference import FraudScorer
+from fraud_detector.model.inference import FraudScorer, MissingBehavioralFeatures
 from fraud_detector.schemas import AuditRecord, Prediction, Transaction
 from fraud_detector.security import ResourceLimits, authorize, secret
 
@@ -99,6 +99,9 @@ def predict(transaction: Transaction, request: Request):
         if scorer is None:
             raise HTTPException(503, "Model unavailable")
         payload = transaction.model_dump(mode="json")
+        # Preserve pre-v2 hashes exactly for existing idempotency records.
+        if transaction.behavioral_features is None:
+            payload.pop("behavioral_features", None)
         digest = hashlib.sha256(
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
@@ -113,7 +116,10 @@ def predict(transaction: Transaction, request: Request):
                 raise HTTPException(409, "Transaction ID already used for different input")
             outcome = "duplicate"
             return Prediction(**record.model_dump(exclude={"request_hash"}))
-        probability, decision = scorer.predict(transaction)
+        try:
+            probability, decision = scorer.predict(transaction)
+        except MissingBehavioralFeatures as error:
+            raise HTTPException(422, str(error)) from None
         record = AuditRecord(
             transaction_id=transaction.transaction_id,
             source_transaction_id=transaction.source_transaction_id,

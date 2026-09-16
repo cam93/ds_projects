@@ -36,6 +36,28 @@ On macOS, install PyTorch from the standard Python package index instead of the 
 The constraints file pins tested packages. Docker pins its Python base by digest and uses CPU
 PyTorch. CI builds the image, runs isolated HTTP tests, and rejects HIGH/CRITICAL image findings.
 
+## Generate demo data and live traffic
+
+`terraform apply` now starts a checkpointed synthetic producer at up to four transactions/second.
+It continuously creates new customer/terminal transactions, scores them and updates Grafana.
+Anonymous visitors can view the dashboard at http://localhost:3000. Fraud labels stay local to
+simulation/evaluation and are never sent to the scoring API.
+
+A 90-day dataset has also been generated locally: **261,128 transactions and 5,817 fraud cases**,
+with fraud represented in training, validation and test. See [simulator commands and configuration](docs/SIMULATOR.md)
+for batch generation, standalone streaming, ground-truth exports, simulated time and restart behavior.
+This expands the data; it does not certify or automatically replace the existing model.
+
+## Compare models with behavioral features
+
+The preparer and live simulator now share 18 point-in-time features, including customer spending
+deviations, activity windows and terminal familiarity. Compare logistic regression, gradient-boosted
+trees and neural networks against the original four-feature baseline with
+`scripts/compare_models.py`. Selection uses validation data only, followed by chronological test
+and independent-population evaluation. See [the workflow](docs/MODEL_COMPARISON.md) and
+[the completed selection report](reports/model-comparison/MODEL_SELECTION.md).
+Comparison exports a portable candidate without changing the deployed model or production gates.
+
 ## Prepare data
 
 Prefer CSV with the Handbook columns or Parquet (install pyarrow separately for Parquet).
@@ -134,9 +156,11 @@ Dockerfile changes trigger rebuilds; Python caches do not. API/ledger creation w
 and fails after 120 seconds if unhealthy. Diagnose failures with `docker logs fraud-dev-api` and
 `docker logs fraud-dev-audit-store`.
 
-Replay is disabled by default; use `terraform apply -var='enable_replay=true'` to opt in. It is a
+Synthetic streaming is enabled by default. Use `terraform apply -var='enable_simulator=false'`
+to disable it. Fixed-file replay is disabled by default; `terraform apply -var='enable_replay=true'`
+opts into replay and turns off the simulator. It is a
 finite job, so a successful exit is expected. `terraform destroy` removes the managed volumes,
-including local audit records and replay checkpoints; back up data you intend to retain.
+including local audit records, simulator history and replay checkpoints; back up data you intend to retain.
 Terraform does not create cloud machines or HA infrastructure. Do not run Compose and Terraform
 against the same deployment. The production path is documented in `docs/HA_DEPLOYMENT.md`.
 

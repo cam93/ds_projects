@@ -1,0 +1,54 @@
+{
+  "approved": false,
+  "model_version": "mlp-18947f9f8992-85c2f2c19bdb",
+  "threshold": 0.9047731757164001,
+  "validation": {
+    "precision": 0.4587737843551797,
+    "recall": 0.3243647234678625,
+    "average_precision": 0.3033636207351973,
+    "false_positive_rate": 0.0066515966430223195,
+    "true_positive": 217,
+    "false_positive": 256,
+    "false_negative": 452,
+    "true_negative": 38231
+  },
+  "test": {
+    "precision": 0.3006993006993007,
+    "recall": 0.344,
+    "average_precision": 0.25553503521821486,
+    "false_positive_rate": 0.010338321573492543,
+    "true_positive": 172,
+    "false_positive": 400,
+    "false_negative": 328,
+    "true_negative": 38291
+  },
+  "splits": {
+    "train": {
+      "rows": 182781,
+      "positive": 4648,
+      "negative": 178133
+    },
+    "validation": {
+      "rows": 39156,
+      "positive": 669,
+      "negative": 38487
+    },
+    "test": {
+      "rows": 39191,
+      "positive": 500,
+      "negative": 38691
+    }
+  },
+  "dataset_sha256": "18947f9f899212dad112179d91a9fd664933eec90e6ede709e085018475a5eca",
+  "policy_sha256": "e84ebc39a87230d814afee1dc91911ab03d80a9c3a9e67daa3d2519e3d1baa4d",
+  "policy": {
+    "min_positive_per_split": 100,
+    "min_negative_per_split": 1000,
+    "min_precision": 0.8,
+    "min_recall": 0.8,
+    "min_average_precision": 0.8
+  },
+  "torch_version": "2.14.0",
+  "seed": 7,
+  "epochs": 30
+}

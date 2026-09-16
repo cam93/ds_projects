@@ -1,0 +1,7 @@
+{
+  "seed": 7,
+  "mlp_epochs": 30,
+  "max_false_positive_rate": 0.01,
+  "min_positive_per_split": 100,
+  "min_negative_per_split": 1000
+}

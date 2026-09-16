@@ -46,3 +46,9 @@ pip==26.2.1
 psycopg==3.3.5
 psycopg-binary==3.3.5
 psycopg-pool==3.3.1
+
+# Model comparison tooling (Python 3.10 compatible).
+scikit-learn==1.7.2
+scipy==1.15.3
+joblib==1.5.2
+threadpoolctl==3.6.0

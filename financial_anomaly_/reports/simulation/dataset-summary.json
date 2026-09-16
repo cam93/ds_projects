@@ -1,0 +1,43 @@
+{
+  "synthetic": true,
+  "generator_version": 1,
+  "config": {
+    "seed": 7,
+    "customers": 1000,
+    "terminals": 100,
+    "transactions_per_customer_day": 3.0,
+    "terminal_compromise_rate": 0.02,
+    "customer_compromise_rate": 0.005,
+    "unusual_purchase_fraud_rate": 0.002,
+    "drift_day": null,
+    "drift_multiplier": 1.35
+  },
+  "start": "2024-01-01T00:00:00+00:00",
+  "days": 90,
+  "rows": 261128,
+  "fraud": 5817,
+  "scenario_counts": {
+    "0": 255311,
+    "2": 3014,
+    "1": 551,
+    "3": 2252
+  },
+  "sha256": "8779d91485d513754ddddf1bf4fbd978245d561a8791036b92f13db54a02fc1a",
+  "splits": {
+    "train": {
+      "rows": 182781,
+      "fraud": 4648,
+      "genuine": 178133
+    },
+    "validation": {
+      "rows": 39156,
+      "fraud": 669,
+      "genuine": 38487
+    },
+    "test": {
+      "rows": 39191,
+      "fraud": 500,
+      "genuine": 38691
+    }
+  }
+}

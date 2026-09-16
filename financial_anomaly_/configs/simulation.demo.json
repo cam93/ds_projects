@@ -1,0 +1,11 @@
+{
+  "seed": 7,
+  "customers": 1000,
+  "terminals": 100,
+  "transactions_per_customer_day": 3.0,
+  "terminal_compromise_rate": 0.02,
+  "customer_compromise_rate": 0.005,
+  "unusual_purchase_fraud_rate": 0.002,
+  "drift_day": null,
+  "drift_multiplier": 1.35
+}
