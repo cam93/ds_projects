@@ -107,38 +107,36 @@ input returns 409. Permanent errors stop replay; transient failures get six boun
 For an external trusted producer, set `PUBLIC_HOST` to your DNS name and use
 `docker compose --profile public up -d`. The optional Caddy gateway provisions TLS and exposes
 only `/predict`; configure DNS/firewall first. Never expose audit/metrics/Grafana directly.
-Terraform provisions the private single-host stack with equivalent aliases and secret mounts:
+Terraform provisions the private single-host **development** stack from the project directory:
 
 ```bash
-terraform -chdir=infra/terraform/environments/dev init
-terraform -chdir=infra/terraform/environments/dev validate
-terraform -chdir=infra/terraform/environments/dev plan -var='model_sha256=APPROVED_SHA256'
+# First checkout only (already initialized in this workspace):
+terraform init
+# Normal lifecycle:
+terraform apply
+terraform destroy
 ```
 
-Terraform does not create cloud machines or public TLS infrastructure. Do not run Compose and
-Terraform against the same deployment. Review the plan before apply.
+The model SHA256 is calculated automatically from `models/artifacts/fraud_model.pt`. No shell
+hash command, `-chdir`, `-var`, or `-parallelism=1` is needed. The project-root entry point uses
+`infra/terraform/environments/dev/terraform.tfstate`, preserving the original state and resource
+addresses. Run only one Terraform operation at a time; prefer this entry point going forward.
+On a fresh checkout, generate secrets with `python scripts/init_secrets.py` first and ensure the
+local model exists. Development mode permits the bundled unapproved model, while still checking
+its hash and keeping authentication enabled. This does not change production release gates.
 
-The Docker provider currently uploads build contexts through its legacy image-build API. Run
-Terraform with serialized resource operations to avoid concurrent context uploads causing
-`archive/tar: invalid tar header` or `context canceled` errors:
+Terraform builds one shared application image using Docker's `default` BuildKit builder; the
+first uncached build downloads PyTorch and may take several minutes. Progress is available in
+`terraform-build.log` (`tail -f terraform-build.log`). Source changes, dependency constraints and
+Dockerfile changes trigger rebuilds; Python caches do not. API/ledger creation waits for readiness
+and fails after 120 seconds if unhealthy. Diagnose failures with `docker logs fraud-dev-api` and
+`docker logs fraud-dev-audit-store`.
 
-```bash
-terraform -chdir=infra/terraform/environments/dev apply \
-  -parallelism=1 \
-  -var="model_sha256=$MODEL_SHA256"
-```
-
-This is intentionally limited to Terraform; direct `docker build` uses BuildKit normally.
-
-The Terraform `dev` environment runs the API with `APP_ENV=development`, so a candidate model
-without release approval metadata can be exercised locally. Non-development environments run with
-production checks enabled and require an approved model artifact.
-
-Terraform can destroy only resources recorded in its state. If an apply is interrupted while an
-image is building, its container may never be added to state; inspect with
-`terraform -chdir=infra/terraform/environments/dev state list` and remove any orphaned containers
-explicitly with `docker rm -f <container-name>` before retrying. Do not use Compose and Terraform
-to manage the same container names.
+Replay is disabled by default; use `terraform apply -var='enable_replay=true'` to opt in. It is a
+finite job, so a successful exit is expected. `terraform destroy` removes the managed volumes,
+including local audit records and replay checkpoints; back up data you intend to retain.
+Terraform does not create cloud machines or HA infrastructure. Do not run Compose and Terraform
+against the same deployment. The production path is documented in `docs/HA_DEPLOYMENT.md`.
 
 See [operations and release requirements](docs/PRODUCTION_RUNBOOK.md) for migration, backup,
 retention, alerts, replay evaluation, rollout and remaining acceptance work.

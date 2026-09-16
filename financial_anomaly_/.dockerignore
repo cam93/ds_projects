@@ -32,3 +32,5 @@ models
 *.db
 *.db-wal
 *.db-shm
+
+*.log
