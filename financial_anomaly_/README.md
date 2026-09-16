@@ -118,6 +118,18 @@ terraform -chdir=infra/terraform/environments/dev plan -var='model_sha256=APPROV
 Terraform does not create cloud machines or public TLS infrastructure. Do not run Compose and
 Terraform against the same deployment. Review the plan before apply.
 
+The Docker provider currently uploads build contexts through its legacy image-build API. Run
+Terraform with serialized resource operations to avoid concurrent context uploads causing
+`archive/tar: invalid tar header` or `context canceled` errors:
+
+```bash
+terraform -chdir=infra/terraform/environments/dev apply \
+  -parallelism=1 \
+  -var="model_sha256=$MODEL_SHA256"
+```
+
+This is intentionally limited to Terraform; direct `docker build` uses BuildKit normally.
+
 The Terraform `dev` environment runs the API with `APP_ENV=development`, so a candidate model
 without release approval metadata can be exercised locally. Non-development environments run with
 production checks enabled and require an approved model artifact.
