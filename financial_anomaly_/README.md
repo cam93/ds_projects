@@ -85,7 +85,9 @@ cp .env.example .env
 
 Set `MODEL_SHA256` in `.env` to the approved artifact's SHA256. The API verifies both this hash and
 its embedded release approval at startup. Secret files stay outside Git/images. Distinct bearer
-keys protect prediction ingestion, audit writes, audit reads and metrics. Grafana has its own
+keys protect prediction ingestion, audit writes, audit reads and metrics. Grafana allows anonymous **Viewer** access for this synthetic-data demo and opens the fraud
+dashboard by default. Visitors can view charts but cannot save dashboards, configure data sources
+or administer Grafana. Administrator sign-in remains available at `/login` using its separate
 password. To rotate keys, replace the files and restart all affected services together.
 
 ```bash

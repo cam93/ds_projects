@@ -127,10 +127,22 @@ with httpx.Client(timeout=5) as client:
   time.sleep(1)
  else:raise RuntimeError('Prometheus target did not become healthy')
  assert client.get('http://grafana:3000/api/health').json()['database']=='ok'
- assert client.get('http://grafana:3000/api/search').status_code==401
+ home=client.get('http://grafana:3000/api/dashboards/home')
+ assert home.status_code==200,home.text
+ home_data=home.json()
+ if 'redirectUri' in home_data:
+  home_uid=home_data['redirectUri'].split('/')[2]
+  home_data=client.get('http://grafana:3000/api/dashboards/uid/'+home_uid).json()
+ assert home_data.get('dashboard',{}).get('title')=='Realtime Fraud Detector',home_data
+ dashboard=client.get('http://grafana:3000/api/dashboards/uid/fraud-detector')
+ assert dashboard.status_code==200,dashboard.text
+ assert dashboard.json()['meta']['canSave'] is False
+ assert client.post('http://grafana:3000/api/dashboards/db',json={'dashboard':{'title':'Unauthorized demo edit','panels':[]}}).status_code in (401,403)
+ assert client.post('http://grafana:3000/api/datasources',json={'name':'Unauthorized source','type':'prometheus','url':'http://prometheus:9090','access':'proxy'}).status_code in (401,403)
+ assert client.get('http://grafana:3000/api/admin/settings').status_code in (401,403)
  r=client.get('http://prometheus:9090/api/v1/query',params={'query':'fraud_predictions_total'})
  assert r.json()['data']['result'],r.text
- print('Authenticated metrics scraping, private Grafana, and dataset replay verified')
+ print('Authenticated metrics scraping, anonymous read-only Grafana, and dataset replay verified')
 """
         print(run("exec", "-T", "api", "python", "-c", code).stdout)
         print("Isolated full Compose verification passed")

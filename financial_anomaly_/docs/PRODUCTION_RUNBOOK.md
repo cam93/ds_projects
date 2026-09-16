@@ -56,7 +56,9 @@ then resume the API and producers. Restore into a separate test volume periodica
 Prometheus scrapes authenticated metrics. Alert rules cover an unavailable API, persistence
 failures and p95 latency above one second. These are rules only: configure an Alertmanager or
 managed notification receiver before unattended deployment. Grafana and Prometheus are private
-loopback interfaces. Add host disk-space and backup-age monitoring in the deployment platform.
+loopback interfaces. The local demo enables anonymous Grafana Viewer access; disable anonymous
+authentication before reusing it for private production metrics. Administrator actions still require
+login. Add host disk-space and backup-age monitoring in the deployment platform.
 
 `fraud_requests_total` counts authenticated request outcomes, including idempotent replays;
 `fraud_predictions_total` counts newly inserted predictions. Request latency includes failures.
