@@ -149,7 +149,7 @@ resource "docker_container" "simulator" {
   count         = var.enable_simulator && !var.enable_replay ? 1 : 0
   name          = "fraud-${var.environment}-simulator"
   image         = docker_image.runtime.image_id
-  command       = ["python", "-m", "fraud_detector.simulator", "stream", "--seed", "17", "--url", "http://api:8000", "--state", "/state/live.db", "--api-key-file", "/run/secrets/api_key"]
+  command       = ["python", "-m", "fraud_detector.simulator", "stream", "--seed", "17", "--url", "http://api:8000", "--state", "/state/live.db", "--api-key-file", "/run/secrets/api_key", "--metrics-port", "8002"]
   depends_on    = [docker_container.service]
   user          = "10001:10001"
   read_only     = true
@@ -162,7 +162,10 @@ resource "docker_container" "simulator" {
   restart         = "on-failure"
   max_retry_count = 3
   log_opts        = { "max-size" = "10m", "max-file" = "3" }
-  networks_advanced { name = docker_network.backend.name }
+  networks_advanced {
+    name    = docker_network.backend.name
+    aliases = ["simulator"]
+  }
   mounts {
     type   = "volume"
     source = docker_volume.simulator.name
@@ -174,12 +177,20 @@ resource "docker_container" "simulator" {
     target    = "/run/secrets/api_key"
     read_only = true
   }
+  mounts {
+    type      = "bind"
+    source    = "${local.bind_root}/secrets/metrics_key"
+    target    = "/run/secrets/metrics_key"
+    read_only = true
+  }
 }
 resource "docker_image" "prometheus" { name = "prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0" }
 resource "docker_image" "grafana" { name = "grafana/grafana:13.2.2@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0" }
 resource "docker_container" "prometheus" {
-  name          = "fraud-${var.environment}-prometheus"
-  image         = docker_image.prometheus.image_id
+  name  = "fraud-${var.environment}-prometheus"
+  image = docker_image.prometheus.image_id
+  # Recreate on configuration changes so plain apply activates new scrape jobs.
+  env           = ["CONFIG_SHA256=${sha256(join("", [filesha256("${var.project_root}/monitoring/prometheus/prometheus.yml"), filesha256("${var.project_root}/monitoring/prometheus/alerts.yml")]))}"]
   read_only     = true
   security_opts = ["no-new-privileges:true"]
   capabilities { drop = ["ALL"] }

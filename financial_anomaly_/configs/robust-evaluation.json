@@ -1,0 +1,16 @@
+{
+  "training_seeds": [41, 53, 67],
+  "final_seed": 907,
+  "days": 112,
+  "customers": 500,
+  "terminals": 50,
+  "feedback_delay_days": 7,
+  "train_end_days": [42, 63],
+  "calibration_days": 14,
+  "evaluation_days": 14,
+  "final_train_end_day": 84,
+  "fpr_targets": [0.005, 0.0075, 0.01],
+  "max_fpr": 0.01,
+  "epochs": 15,
+  "seed": 7
+}

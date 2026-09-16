@@ -22,13 +22,15 @@ from uuid import uuid4
 import httpx
 
 from apps.traffic_generator.main import post_transaction
+from fraud_detector.features.adaptive import AdaptiveState
 from fraud_detector.features.handbook import (
     FEATURE_VERSION,
     FeatureState,
     RunningStats,
     calculate_features,
 )
-from fraud_detector.schemas import BehavioralFeatures, Prediction, Transaction
+from fraud_detector.quality import add_quality, initialize_quality, start_metrics
+from fraud_detector.schemas import AdaptiveFeatures, BehavioralFeatures, Prediction, Transaction
 from fraud_detector.simulation import (
     COLUMNS,
     GENERATOR_VERSION,
@@ -176,7 +178,7 @@ def decode_features(value):
 class Stream:
     """Single producer with a durable pending request and an independent truth/response journal."""
 
-    def __init__(self, path, config, target, start=None):
+    def __init__(self, path, config, target, start=None, feedback_delay_days=7):
         self.db = sqlite3.connect(path)
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
@@ -189,6 +191,7 @@ class Stream:
             CREATE INDEX IF NOT EXISTS events_pending ON events(delivered_at);
         """)
         try:
+            initialize_quality(self.db)
             saved = self.db.execute("SELECT value FROM state WHERE id=1").fetchone()
             if saved:
                 self.state = json.loads(saved[0])
@@ -235,6 +238,16 @@ class Stream:
                 self.state["feature_version"] = FEATURE_VERSION
                 with self.db:
                     self._save()
+            if "adaptive" not in self.state:
+                adaptive = AdaptiveState(feedback_delay_days)
+                for (raw_json,) in self.db.execute("SELECT raw_json FROM events ORDER BY rowid"):
+                    adaptive.observe_raw(json.loads(raw_json))
+                self.state["adaptive"] = adaptive.snapshot()
+                with self.db:
+                    self._save()
+            if self.state["adaptive"]["delay_days"] != feedback_delay_days:
+                raise ValueError("Feedback delay differs from saved state; use a new state file")
+            self.adaptive = AdaptiveState(feedback_delay_days, self.state["adaptive"])
             self.features = decode_features(self.state["features"])
             self.world = TransactionWorld(config, parse_start(self.state["start"]))
             self.cached_day, self.rows = None, []
@@ -268,6 +281,7 @@ class Stream:
             timestamp=stamp,
             state=self.features,
         )
+        adaptive = self.adaptive.observe_raw(raw)
         request = Transaction(
             transaction_id=f"{self.state['run_id']}:{raw['TRANSACTION_ID']:014d}",
             source_transaction_id=str(raw["TRANSACTION_ID"]),
@@ -279,7 +293,9 @@ class Stream:
             customer_history_days=features["customer_history_days"],
             hour_of_day=int(features["hour_of_day"]),
             behavioral_features=BehavioralFeatures.from_features(features),
+            adaptive_features=AdaptiveFeatures.from_features(adaptive, self.adaptive.delay_days),
         ).model_dump(mode="json", exclude_none=True)
+        self.state["adaptive"] = self.adaptive.snapshot()
         self.state["offset"] += 1
         self.state["features"] = encode_features(self.features)
         with self.db:
@@ -295,6 +311,13 @@ class Stream:
         if response.get("transaction_id") != request["transaction_id"]:
             raise ValueError("API response transaction ID does not match the pending request")
         with self.db:
+            event = self.db.execute(
+                "SELECT raw_json FROM events WHERE transaction_id=? AND delivered_at IS NULL",
+                (request["transaction_id"],),
+            ).fetchone()
+            if event is None:
+                return  # A duplicate acknowledgement must not count twice.
+            add_quality(self.db, json.loads(event[0]), response)
             self.db.execute(
                 "UPDATE events SET response_json=?, delivered_at=? WHERE transaction_id=?",
                 (
@@ -308,14 +331,24 @@ class Stream:
         self.db.close()
 
 
-def stream(config, path, target, client, start=None, count=0, rate=4.0, sleep=time.sleep):
+def stream(
+    config,
+    path,
+    target,
+    client,
+    start=None,
+    count=0,
+    rate=4.0,
+    sleep=time.sleep,
+    feedback_delay_days=7,
+):
     if not math.isfinite(rate) or not 0 < rate <= 10:
         raise ValueError("Rate must be greater than zero and at most 10 transactions/second")
     if count < 0:
         raise ValueError("Count must be nonnegative (zero means run until stopped)")
     path = Path(path)
     with state_lock(path):
-        producer = Stream(path, config, target, start)
+        producer = Stream(path, config, target, start, feedback_delay_days)
         try:
             delivered = 0
             while count == 0 or delivered < count:
@@ -391,6 +424,16 @@ def main(argv=None):
             sub.add_argument("--days", type=int, default=90)
             sub.add_argument("--output", type=Path, required=True)
         else:
+            sub.add_argument("--feedback-delay-days", type=float, default=7)
+            sub.add_argument(
+                "--metrics-port",
+                type=int,
+                default=0,
+                help="Optional private metrics listener; 0 disables",
+            )
+            sub.add_argument(
+                "--metrics-key-file", type=Path, default=Path("/run/secrets/metrics_key")
+            )
             sub.add_argument("--state", type=Path, default=Path("data/simulator/live.db"))
             sub.add_argument("--url", default="http://localhost:8000")
             sub.add_argument(
@@ -456,7 +499,28 @@ def main(argv=None):
                 timeout=5,
                 trust_env=False,
             ) as client:
-                total = stream(config, args.state, target, client, start, args.count, args.rate)
+                server = (
+                    start_metrics(
+                        args.state, args.metrics_port, args.metrics_key_file.read_text().strip()
+                    )
+                    if args.metrics_port
+                    else None
+                )
+                try:
+                    total = stream(
+                        config,
+                        args.state,
+                        target,
+                        client,
+                        start,
+                        args.count,
+                        args.rate,
+                        feedback_delay_days=args.feedback_delay_days,
+                    )
+                finally:
+                    if server:
+                        server.shutdown()
+                        server.server_close()
             print(f"Delivered {total} transactions; resume using {args.state}")
     except KeyboardInterrupt:
         print(

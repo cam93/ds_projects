@@ -12,8 +12,9 @@ sys.path[:0] = ["src", "scripts"]
 import torch
 from train import export_artifact
 
+from fraud_detector.features.adaptive import AdaptiveState
 from fraud_detector.features.handbook import FEATURE_NAMES, FeatureState, calculate_features
-from fraud_detector.schemas import BehavioralFeatures, Transaction
+from fraud_detector.schemas import AdaptiveFeatures, BehavioralFeatures, Transaction
 
 root = Path.cwd()
 parser = argparse.ArgumentParser(
@@ -64,6 +65,15 @@ with tempfile.TemporaryDirectory(prefix="fraud-compose-") as temp:
             timestamp=parsed.timestamp,
             state=FeatureState(),
         )
+        delay = json.loads(args.model.read_text()).get("feedback_delay_days", 7)
+        adaptive = AdaptiveState(delay).observe(
+            customer_id=parsed.customer_id,
+            terminal_id=parsed.terminal_id,
+            amount=parsed.amount,
+            timestamp=parsed.timestamp,
+            outcome=0,
+        )
+        event["adaptive_features"] = AdaptiveFeatures.from_features(adaptive, delay).model_dump()
         event["behavioral_features"] = BehavioralFeatures.from_features(features).model_dump()
     (d / "data/replay.jsonl").write_text(json.dumps(event) + "\n")
     import hashlib
@@ -203,6 +213,8 @@ secrets:
             "assert c.execute('SELECT count(*) FROM events WHERE delivered_at IS NULL').fetchone()[0]==0; "
             "print('Live simulator delivered and journaled 15 distinct transactions across container restarts')",
         )
+        # Start the long-lived producer so Prometheus can scrape its authenticated quality metrics.
+        run("--profile", "simulation", "up", "-d", "--no-build", "--no-deps", "simulator")
         code = """
 import httpx,time
 from pathlib import Path
@@ -214,6 +226,10 @@ with httpx.Client(timeout=5) as client:
   except Exception:pass
   time.sleep(1)
  else:raise RuntimeError('Prometheus target did not become healthy')
+ assert client.get('http://simulator:8002/metrics').status_code==401
+ quality=client.get('http://simulator:8002/metrics',headers={'Authorization':'Bearer '+Path('/run/secrets/metrics_key').read_text().strip()})
+ assert quality.status_code==200 and 'fraud_demo_quality' in quality.text,quality.text
+ assert 'customer_id' not in quality.text and 'transaction_id' not in quality.text
  assert client.get('http://grafana:3000/api/health').json()['database']=='ok'
  home=client.get('http://grafana:3000/api/dashboards/home')
  assert home.status_code==200,home.text
@@ -230,7 +246,9 @@ with httpx.Client(timeout=5) as client:
  assert client.get('http://grafana:3000/api/admin/settings').status_code in (401,403)
  r=client.get('http://prometheus:9090/api/v1/query',params={'query':'fraud_predictions_total'})
  assert r.json()['data']['result'],r.text
- print('Authenticated metrics scraping, anonymous read-only Grafana, replay and live simulation verified')
+ q=client.get('http://prometheus:9090/api/v1/query',params={'query':'sum(fraud_demo_quality)'})
+ assert q.json()['data']['result'],q.text
+ print('Authenticated quality and API metrics scraping, anonymous read-only Grafana, replay and live simulation verified')
 """
         print(run("exec", "-T", "api", "python", "-c", code).stdout)
         print("Isolated full Compose verification passed")

@@ -58,6 +58,19 @@ and independent-population evaluation. See [the workflow](docs/MODEL_COMPARISON.
 [the completed selection report](reports/model-comparison/MODEL_SELECTION.md).
 Comparison exports a portable candidate without changing the deployed model or production gates.
 
+## Control false positives and monitor quality
+
+The [rolling evaluation workflow](docs/ROBUST_EVALUATION.md) compares three populations, two
+chronological windows and 0.5%/0.75%/1% calibration targets. It also tests rolling spending changes
+and seven-day delayed fraud feedback. The [completed report](reports/robust-evaluation/REPORT.md)
+selected an 18-feature gradient-boosted model: final synthetic FPR 0.60%, precision 56.14%, recall
+30.78%. The candidate remains unapproved and has not replaced the deployed artifact.
+
+The simulator now publishes authenticated aggregate quality metrics. Grafana shows precision,
+recall, false positives per 1,000 legitimate transactions and fraud-scenario recall by model version.
+These are cumulative synthetic oracle results; model feedback still respects its investigation delay.
+The updated charts and producer are included in the next normal `terraform apply`.
+
 ## Prepare data
 
 Prefer CSV with the Handbook columns or Parquet (install pyarrow separately for Parquet).

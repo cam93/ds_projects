@@ -143,3 +143,12 @@ The simulator now sends a complete `behavioral_features` block using the same im
 offline preparation. On first resume, older journals rebuild feature history from their saved raw
 events. Any already pending request retains its exact original body for safe retries. Finish such
 a pending legacy request against the old model before switching to an 18-feature candidate.
+
+
+## Delayed feedback and quality metrics
+
+The producer now also computes rolling spending changes and delayed investigation feedback in
+an `adaptive_features` block. The default delay is seven simulated days, configurable with
+`--feedback-delay-days` on a new journal. See [the evaluation and monitoring guide](ROBUST_EVALUATION.md)
+for state migration, delay semantics and the new Grafana quality charts. The live simulator's
+private metrics endpoint is enabled automatically in Terraform and the Compose simulation profile.

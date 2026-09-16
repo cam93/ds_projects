@@ -1,0 +1,210 @@
+{
+  "selected": "v2_hist_gradient_boosting@0.0075",
+  "policy": {
+    "training_seeds": [
+      41,
+      53,
+      67
+    ],
+    "final_seed": 907,
+    "days": 112,
+    "customers": 500,
+    "terminals": 50,
+    "feedback_delay_days": 7,
+    "train_end_days": [
+      42,
+      63
+    ],
+    "calibration_days": 14,
+    "evaluation_days": 14,
+    "final_train_end_day": 84,
+    "fpr_targets": [
+      0.005,
+      0.0075,
+      0.01
+    ],
+    "max_fpr": 0.01,
+    "epochs": 15,
+    "seed": 7
+  },
+  "policy_sha256": "a27f7bbedf064ecb704539f19e8d7f1d1f57b7475af44e534e67438386644c32",
+  "rolling_constraint_met": true,
+  "selection": "highest mean recall among candidates with every rolling FPR Wilson upper bound <= limit; otherwise lowest worst upper bound (unapproved)",
+  "summary": {
+    "v2_logistic@0.005": {
+      "mean_recall": 0.20281970335570962,
+      "mean_precision": 0.5197240449109929,
+      "max_fpr": 0.03748368572174367,
+      "worst_fpr_95_upper": 0.0402676801283964,
+      "fpr_constraint_met": false
+    },
+    "v2_logistic@0.0075": {
+      "mean_recall": 0.21661810694116304,
+      "mean_precision": 0.4538562687380226,
+      "max_fpr": 0.0597755155311929,
+      "worst_fpr_95_upper": 0.0632219277263351,
+      "fpr_constraint_met": false
+    },
+    "v2_logistic@0.01": {
+      "mean_recall": 0.22293103448229115,
+      "mean_precision": 0.426109616743398,
+      "max_fpr": 0.06906812842599844,
+      "worst_fpr_95_upper": 0.07274619379172112,
+      "fpr_constraint_met": false
+    },
+    "v2_hist_gradient_boosting@0.005": {
+      "mean_recall": 0.19216780806246012,
+      "mean_precision": 0.628374637168737,
+      "max_fpr": 0.004323656578134651,
+      "worst_fpr_95_upper": 0.005349376749856882,
+      "fpr_constraint_met": true
+    },
+    "v2_hist_gradient_boosting@0.0075": {
+      "mean_recall": 0.20359272410780602,
+      "mean_precision": 0.48293081714971575,
+      "max_fpr": 0.0067943174799258805,
+      "worst_fpr_95_upper": 0.00805095620073504,
+      "fpr_constraint_met": true
+    },
+    "v2_hist_gradient_boosting@0.01": {
+      "mean_recall": 0.21253814298389598,
+      "mean_precision": 0.4217060680301666,
+      "max_fpr": 0.010500308832612723,
+      "worst_fpr_95_upper": 0.012033548245297412,
+      "fpr_constraint_met": false
+    },
+    "v2_mlp@0.005": {
+      "mean_recall": 0.19984938662327556,
+      "mean_precision": 0.536726530304067,
+      "max_fpr": 0.022053898078013088,
+      "worst_fpr_95_upper": 0.024216670285146947,
+      "fpr_constraint_met": false
+    },
+    "v2_mlp@0.0075": {
+      "mean_recall": 0.21525161271098625,
+      "mean_precision": 0.4952173541440334,
+      "max_fpr": 0.044056268356778484,
+      "worst_fpr_95_upper": 0.047034961380742035,
+      "fpr_constraint_met": false
+    },
+    "v2_mlp@0.01": {
+      "mean_recall": 0.22893256419211883,
+      "mean_precision": 0.46423613173965284,
+      "max_fpr": 0.05606224558149121,
+      "worst_fpr_95_upper": 0.05938753840167304,
+      "fpr_constraint_met": false
+    },
+    "v3_logistic@0.005": {
+      "mean_recall": 0.19864653412726382,
+      "mean_precision": 0.4228860853232834,
+      "max_fpr": 0.031225846344102644,
+      "worst_fpr_95_upper": 0.03376720106664205,
+      "fpr_constraint_met": false
+    },
+    "v3_logistic@0.0075": {
+      "mean_recall": 0.21172418576316207,
+      "mean_precision": 0.37761340615911293,
+      "max_fpr": 0.04426237955376926,
+      "worst_fpr_95_upper": 0.04724746084643882,
+      "fpr_constraint_met": false
+    },
+    "v3_logistic@0.01": {
+      "mean_recall": 0.22126814855652932,
+      "mean_precision": 0.3392443583432181,
+      "max_fpr": 0.05410418921007884,
+      "worst_fpr_95_upper": 0.057376178576603834,
+      "fpr_constraint_met": false
+    },
+    "v3_hist_gradient_boosting@0.005": {
+      "mean_recall": 0.19262557637149633,
+      "mean_precision": 0.5447200013819399,
+      "max_fpr": 0.013813876194432905,
+      "worst_fpr_95_upper": 0.01556211817961421,
+      "fpr_constraint_met": false
+    },
+    "v3_hist_gradient_boosting@0.0075": {
+      "mean_recall": 0.2018553509403829,
+      "mean_precision": 0.46094351426534047,
+      "max_fpr": 0.01885126713751558,
+      "worst_fpr_95_upper": 0.020870368824332755,
+      "fpr_constraint_met": false
+    },
+    "v3_hist_gradient_boosting@0.01": {
+      "mean_recall": 0.21076090803502232,
+      "mean_precision": 0.40487220327104545,
+      "max_fpr": 0.02149979227253843,
+      "worst_fpr_95_upper": 0.02364591611084823,
+      "fpr_constraint_met": false
+    },
+    "v3_mlp@0.005": {
+      "mean_recall": 0.20783188721966084,
+      "mean_precision": 0.4994828000353988,
+      "max_fpr": 0.05601071778224352,
+      "worst_fpr_95_upper": 0.059334622296309855,
+      "fpr_constraint_met": false
+    },
+    "v3_mlp@0.0075": {
+      "mean_recall": 0.2257399614637775,
+      "mean_precision": 0.44319577997217974,
+      "max_fpr": 0.08455711856546606,
+      "worst_fpr_95_upper": 0.08855423643400226,
+      "fpr_constraint_met": false
+    },
+    "v3_mlp@0.01": {
+      "mean_recall": 0.23612000317050663,
+      "mean_precision": 0.40583985237616854,
+      "max_fpr": 0.110681712784047,
+      "worst_fpr_95_upper": 0.11517311111801444,
+      "fpr_constraint_met": false
+    }
+  },
+  "threshold": 0.8280339469486367,
+  "populations": [
+    {
+      "config": {
+        "seed": 41,
+        "customers": 500,
+        "terminals": 50,
+        "transactions_per_customer_day": 3.0,
+        "terminal_compromise_rate": 0.02,
+        "customer_compromise_rate": 0.005,
+        "unusual_purchase_fraud_rate": 0.002,
+        "drift_day": null,
+        "drift_multiplier": 1.35
+      },
+      "rows": 156214,
+      "feature_sha256": "59da1a7aaf6da389abf91398187a8a31d9467bc1c8d39e74f4f9d4a49adc5ee1"
+    },
+    {
+      "config": {
+        "seed": 53,
+        "customers": 500,
+        "terminals": 50,
+        "transactions_per_customer_day": 3.0,
+        "terminal_compromise_rate": 0.02,
+        "customer_compromise_rate": 0.005,
+        "unusual_purchase_fraud_rate": 0.002,
+        "drift_day": null,
+        "drift_multiplier": 1.35
+      },
+      "rows": 160271,
+      "feature_sha256": "d4ded35db77ee701f76e146ce1cdcc69031a716da39e883e44319b1f7414336f"
+    },
+    {
+      "config": {
+        "seed": 67,
+        "customers": 500,
+        "terminals": 50,
+        "transactions_per_customer_day": 3.0,
+        "terminal_compromise_rate": 0.02,
+        "customer_compromise_rate": 0.005,
+        "unusual_purchase_fraud_rate": 0.002,
+        "drift_day": null,
+        "drift_multiplier": 1.35
+      },
+      "rows": 158790,
+      "feature_sha256": "f148af90dd20a439c5a011e1924720d43225a65b7620ac728c4f6064e130fa3f"
+    }
+  ],
+  "artifact_sha256": "baaec4a982e9a0a2cec03a42983d44f184632450be5d782af977b1543f7cfe3e"
+}

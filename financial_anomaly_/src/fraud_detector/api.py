@@ -100,6 +100,8 @@ def predict(transaction: Transaction, request: Request):
             raise HTTPException(503, "Model unavailable")
         payload = transaction.model_dump(mode="json")
         # Preserve pre-v2 hashes exactly for existing idempotency records.
+        if transaction.adaptive_features is None:
+            payload.pop("adaptive_features", None)
         if transaction.behavioral_features is None:
             payload.pop("behavioral_features", None)
         digest = hashlib.sha256(

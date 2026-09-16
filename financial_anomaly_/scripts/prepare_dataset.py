@@ -11,8 +11,9 @@ from pathlib import Path
 import pandas as pd
 from train import split_by_time
 
-from fraud_detector.features.handbook import V2_FEATURE_NAMES, FeatureState, calculate_features
-from fraud_detector.schemas import BehavioralFeatures, Transaction
+from fraud_detector.features.adaptive import V3_FEATURE_NAMES, AdaptiveState
+from fraud_detector.features.handbook import FeatureState, calculate_features
+from fraud_detector.schemas import AdaptiveFeatures, BehavioralFeatures, Transaction
 
 REQUIRED_COLUMNS = (
     "TRANSACTION_ID",
@@ -74,9 +75,9 @@ def validate_and_sort(records: pd.DataFrame) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
-def build_training_features(records: pd.DataFrame) -> pd.DataFrame:
+def build_training_features(records: pd.DataFrame, feedback_delay_days=7) -> pd.DataFrame:
     """Create model-ready numeric features while retaining the fraud label."""
-    online_features = build_online_features(records)
+    online_features = build_online_features(records, feedback_delay_days)
     return pd.DataFrame(
         {
             "transaction_id": records["TRANSACTION_ID"],
@@ -92,9 +93,10 @@ def build_training_features(records: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def build_online_features(records: pd.DataFrame) -> pd.DataFrame:
+def build_online_features(records: pd.DataFrame, feedback_delay_days=7) -> pd.DataFrame:
     """Calculate handbook features in chronological order."""
     state = FeatureState()
+    adaptive = AdaptiveState(feedback_delay_days)
     calculated: list[dict[str, float]] = []
     for index, row in records.iterrows():
         calculated.append(
@@ -106,7 +108,8 @@ def build_online_features(records: pd.DataFrame) -> pd.DataFrame:
                 state=state,
             )
         )
-    return pd.DataFrame(calculated, index=records.index)[V2_FEATURE_NAMES]
+        calculated[-1].update(adaptive.observe_raw(row))
+    return pd.DataFrame(calculated, index=records.index)[V3_FEATURE_NAMES]
 
 
 def build_replay_events(records: pd.DataFrame) -> list[dict[str, object]]:
@@ -129,6 +132,9 @@ def build_replay_events(records: pd.DataFrame) -> list[dict[str, object]]:
                 ),
                 "hour_of_day": int(online_features.iloc[position]["hour_of_day"]),
                 "timestamp": timestamp,
+                "adaptive_features": AdaptiveFeatures.from_features(
+                    online_features.iloc[position]
+                ).model_dump(),
                 "behavioral_features": BehavioralFeatures.from_features(
                     online_features.iloc[position]
                 ).model_dump(),
@@ -137,9 +143,9 @@ def build_replay_events(records: pd.DataFrame) -> list[dict[str, object]]:
     return events
 
 
-def write_outputs(records: pd.DataFrame, output_dir: Path) -> None:
+def write_outputs(records: pd.DataFrame, output_dir: Path, feedback_delay_days=7) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    features = build_training_features(records)
+    features = build_training_features(records, feedback_delay_days)
     records.to_csv(output_dir / "records.csv", index=False)
     features.to_csv(output_dir / "training_features.csv", index=False)
     # Preserve leading-zero IDs and calculate history once across all partitions.
@@ -166,6 +172,9 @@ def write_outputs(records: pd.DataFrame, output_dir: Path) -> None:
                 hour_of_day=int(row.hour_of_day),
                 timestamp=row.timestamp,
                 behavioral_features=BehavioralFeatures.from_features(row._asdict()),
+                adaptive_features=AdaptiveFeatures.from_features(
+                    row._asdict(), feedback_delay_days
+                ),
             )
             line = event.model_dump_json(exclude_none=True) + "\n"
             all_file.write(line)
@@ -192,18 +201,21 @@ def read_source(path: Path, trusted_manifest: dict | None = None) -> pd.DataFram
 
 
 def prepare_dataset(
-    input_path: Path, output_dir: Path, trusted_manifest: dict | None = None
+    input_path: Path, output_dir: Path, trusted_manifest: dict | None = None, feedback_delay_days=7
 ) -> pd.DataFrame:
     records = read_source(input_path, trusted_manifest)
     if not isinstance(records, pd.DataFrame):
         raise TypeError(f"Expected a pandas DataFrame, got {type(records).__name__}")
     prepared = validate_and_sort(records)
-    write_outputs(prepared, output_dir)
+    write_outputs(prepared, output_dir, feedback_delay_days)
     return prepared
 
 
 def prepare_pickles(
-    input_paths: Sequence[Path], output_dir: Path, trusted_manifest: dict | None = None
+    input_paths: Sequence[Path],
+    output_dir: Path,
+    trusted_manifest: dict | None = None,
+    feedback_delay_days=7,
 ) -> pd.DataFrame:
     """Read and combine one or more pickle files before global validation."""
     frames = []
@@ -215,7 +227,7 @@ def prepare_pickles(
     if not frames:
         raise ValueError("At least one pickle file is required")
     prepared = validate_and_sort(pd.concat(frames, ignore_index=True))
-    write_outputs(prepared, output_dir)
+    write_outputs(prepared, output_dir, feedback_delay_days)
     return prepared
 
 
@@ -238,13 +250,16 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="Reviewed mapping of pickle filenames to trusted SHA256 digests",
     )
+    parser.add_argument("--feedback-delay-days", type=float, default=7)
     return parser.parse_args(arguments)
 
 
 def main() -> None:
     args = parse_args()
     manifest = json.loads(args.trusted_manifest.read_text()) if args.trusted_manifest else None
-    prepared = prepare_pickles(args.input_paths, args.output_dir, manifest)
+    prepared = prepare_pickles(
+        args.input_paths, args.output_dir, manifest, args.feedback_delay_days
+    )
     print(f"Validated and saved {len(prepared)} records to {args.output_dir}")
 
 

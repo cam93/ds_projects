@@ -115,6 +115,7 @@ def test_legacy_hash_survives_feature_schema_upgrade(clients, transaction):
     saved = ledger.get("/predictions/" + transaction["transaction_id"]).json()
     legacy = Transaction.model_validate(transaction).model_dump(mode="json")
     legacy.pop("behavioral_features")
+    legacy.pop("adaptive_features")
     expected = hashlib.sha256(
         json.dumps(legacy, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()

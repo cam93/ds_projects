@@ -39,3 +39,5 @@ deploy/kubernetes/rendered/
 
 data/simulator/
 reports/model-comparison/*-test-predictions.csv
+
+reports/robust-evaluation/final-predictions.csv

@@ -41,6 +41,32 @@ class BehavioralFeatures(BaseModel):
         )
 
 
+class AdaptiveFeatures(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    feedback_delay_days: float = Field(ge=1, le=30)
+    customer_mean_amount_1d: float = Field(ge=0, le=1_000_000)
+    customer_mean_amount_7d: float = Field(ge=0, le=1_000_000)
+    customer_spending_change: float = Field(ge=0, le=100_000_000)
+    terminal_mean_amount_1d: float = Field(ge=0, le=1_000_000)
+    terminal_mean_amount_7d: float = Field(ge=0, le=1_000_000)
+    terminal_spending_change: float = Field(ge=0, le=100_000_000)
+    customer_confirmed_fraud_rate: float = Field(ge=0, le=1)
+    terminal_confirmed_fraud_rate: float = Field(ge=0, le=1)
+    customer_feedback_count: int = Field(ge=0, le=100_000_000, strict=True)
+    terminal_feedback_count: int = Field(ge=0, le=100_000_000, strict=True)
+
+    @classmethod
+    def from_features(cls, values, delay_days=7):
+        return cls(
+            feedback_delay_days=delay_days,
+            **{
+                name: int(values[name]) if name.endswith("_count") else float(values[name])
+                for name in cls.model_fields
+                if name != "feedback_delay_days"
+            },
+        )
+
+
 class Transaction(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     transaction_id: Identifier
@@ -53,6 +79,7 @@ class Transaction(BaseModel):
     hour_of_day: int = Field(ge=0, le=23, strict=True)
     timestamp: AwareDatetime
     behavioral_features: BehavioralFeatures | None = None
+    adaptive_features: AdaptiveFeatures | None = None
 
     @model_validator(mode="after")
     def consistent_hour(self):
@@ -72,6 +99,8 @@ class Transaction(BaseModel):
                 raise ValueError("Terminal visits exceed customer history")
             if b.is_new_terminal != int(b.customer_terminal_transactions == 0):
                 raise ValueError("Terminal novelty conflicts with visit count")
+        if self.adaptive_features is not None and self.behavioral_features is None:
+            raise ValueError("Adaptive features require behavioral features")
         return self
 
 

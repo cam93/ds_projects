@@ -6,22 +6,160 @@
     {
       "title": "Predictions per second",
       "type": "timeseries",
-      "targets": [{"expr": "rate(fraud_predictions_total[1m])"}],
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      "targets": [
+        {
+          "expr": "rate(fraud_predictions_total[1m])"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
     },
     {
       "title": "Fraud decisions",
       "type": "timeseries",
-      "targets": [{"expr": "fraud_predictions_total", "legendFormat": "{{decision}}"}],
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      "targets": [
+        {
+          "expr": "fraud_predictions_total",
+          "legendFormat": "{{decision}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
     },
     {
       "title": "Prediction latency",
       "type": "timeseries",
-      "targets": [{"expr": "histogram_quantile(0.95, rate(fraud_prediction_latency_seconds_bucket[5m]))"}],
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(fraud_prediction_latency_seconds_bucket[5m]))"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "title": "Synthetic precision",
+      "description": "Cumulative acknowledged simulator oracle labels, grouped by model. Labels here are known immediately for evaluation only; model feedback is delayed seven simulated days. No denominator means no value. Scenarios: 1 unusual purchase, 2 compromised terminal, 3 spending burst. Requires the running simulator; disabled simulations show no current data.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (model_version) (fraud_demo_quality{outcome=\"tp\"}) / sum by (model_version) (fraud_demo_quality{outcome=~\"tp|fp\"})",
+          "legendFormat": "{{model_version}} {{scenario}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      }
+    },
+    {
+      "title": "Synthetic recall",
+      "description": "Cumulative acknowledged simulator oracle labels, grouped by model. Labels here are known immediately for evaluation only; model feedback is delayed seven simulated days. No denominator means no value. Scenarios: 1 unusual purchase, 2 compromised terminal, 3 spending burst. Requires the running simulator; disabled simulations show no current data.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (model_version) (fraud_demo_quality{outcome=\"tp\"}) / sum by (model_version) (fraud_demo_quality{outcome=~\"tp|fn\"})",
+          "legendFormat": "{{model_version}} {{scenario}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      }
+    },
+    {
+      "title": "False positives per 1,000 legitimate transactions",
+      "description": "Cumulative acknowledged simulator oracle labels, grouped by model. Labels here are known immediately for evaluation only; model feedback is delayed seven simulated days. No denominator means no value. Scenarios: 1 unusual purchase, 2 compromised terminal, 3 spending burst. Requires the running simulator; disabled simulations show no current data.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "1000 * sum by (model_version) (fraud_demo_quality{outcome=\"fp\"}) / sum by (model_version) (fraud_demo_quality{outcome=~\"fp|tn\"})",
+          "legendFormat": "{{model_version}} {{scenario}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      }
+    },
+    {
+      "title": "Synthetic detection by fraud scenario",
+      "description": "Cumulative acknowledged simulator oracle labels, grouped by model. Labels here are known immediately for evaluation only; model feedback is delayed seven simulated days. No denominator means no value. Scenarios: 1 unusual purchase, 2 compromised terminal, 3 spending burst. Requires the running simulator; disabled simulations show no current data.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (model_version, scenario) (fraud_demo_quality{outcome=\"tp\",scenario!=\"0\"}) / sum by (model_version, scenario) (fraud_demo_quality{outcome=~\"tp|fn\",scenario!=\"0\"})",
+          "legendFormat": "{{model_version}} {{scenario}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      }
+    },
+    {
+      "title": "Evaluated acknowledged synthetic transactions",
+      "description": "Cumulative acknowledged simulator oracle labels, grouped by model. Labels here are known immediately for evaluation only; model feedback is delayed seven simulated days. No denominator means no value. Scenarios: 1 unusual purchase, 2 compromised terminal, 3 spending burst. Requires the running simulator; disabled simulations show no current data.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (model_version) (fraud_demo_quality)",
+          "legendFormat": "{{model_version}} {{scenario}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      }
     }
   ],
   "schemaVersion": 39,
-  "version": 1
+  "version": 2
 }

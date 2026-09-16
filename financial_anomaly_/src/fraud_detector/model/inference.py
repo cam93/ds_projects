@@ -7,6 +7,7 @@ from pathlib import Path
 
 import torch
 
+from fraud_detector.features.adaptive import V3_FEATURE_NAMES
 from fraud_detector.features.handbook import FEATURE_NAMES, V2_FEATURE_NAMES
 from fraud_detector.model.portable import PortableModel
 from fraud_detector.schemas import Transaction
@@ -40,12 +41,19 @@ class FraudScorer:
             else torch.load(io.BytesIO(contents), map_location="cpu", weights_only=True)
         )
         self.feature_names = artifact["feature_names"]
-        if self.feature_names not in (FEATURE_NAMES, V2_FEATURE_NAMES):
+        if self.feature_names not in (FEATURE_NAMES, V2_FEATURE_NAMES, V3_FEATURE_NAMES):
             raise ValueError("Model feature order does not match the feature handbook")
         if os.getenv("APP_ENV", "production") == "production" and not artifact.get(
             "release", {}
         ).get("approved"):
             raise ValueError("Model has not passed release evaluation gates")
+        self.feedback_delay_days = artifact.get("feedback_delay_days", 7)
+        if self.feature_names == V3_FEATURE_NAMES and (
+            not is_portable
+            or not isinstance(self.feedback_delay_days, (int, float))
+            or not 1 <= self.feedback_delay_days <= 30
+        ):
+            raise ValueError("v3 requires portable JSON with a valid feedback delay")
         self.threshold = float(artifact["threshold"])
         self.model_version = str(artifact["model_version"])
         if not math.isfinite(self.threshold) or not 0 <= self.threshold <= (
@@ -89,14 +97,26 @@ class FraudScorer:
         )
 
     def predict(self, transaction: Transaction) -> tuple[float, bool]:
-        if self.feature_names == V2_FEATURE_NAMES and transaction.behavioral_features is None:
+        if (
+            self.feature_names in (V2_FEATURE_NAMES, V3_FEATURE_NAMES)
+            and transaction.behavioral_features is None
+        ):
             raise MissingBehavioralFeatures(
                 "This model requires the complete behavioral_features block"
+            )
+        if self.feature_names == V3_FEATURE_NAMES and (
+            transaction.adaptive_features is None
+            or transaction.adaptive_features.feedback_delay_days != self.feedback_delay_days
+        ):
+            raise MissingBehavioralFeatures(
+                "This model requires adaptive_features with its trained feedback delay"
             )
         if self.portable is not None:
             values = transaction.model_dump(exclude={"behavioral_features"})
             if transaction.behavioral_features is not None:
                 values.update(transaction.behavioral_features.model_dump())
+            if transaction.adaptive_features is not None:
+                values.update(transaction.adaptive_features.model_dump())
             probability = self.portable.score(values)
             return probability, probability >= self.threshold
         with torch.inference_mode():
