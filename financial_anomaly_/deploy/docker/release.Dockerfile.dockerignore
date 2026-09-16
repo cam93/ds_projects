@@ -1,0 +1,4 @@
+**
+!models
+!models/artifacts
+!models/artifacts/fraud_model.pt

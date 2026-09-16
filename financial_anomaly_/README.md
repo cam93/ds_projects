@@ -1,374 +1,122 @@
-# Realtime Fraud Detector
+# Fraud transaction scoring service
 
-An end-to-end realtime financial fraud detection platform built with PyTorch,
-Docker, Terraform, Prometheus, and Grafana.
+An authenticated transaction-scoring API, PostgreSQL production ledger (SQLite for development), offline training pipeline,
+restartable dataset replay, and private Prometheus/Grafana monitoring.
 
-## Five-container runtime
+**Release status: hardened implementation; model and operational acceptance still required.**
+The supplied one-day model is deliberately rejected by production startup. Its training split
+has three fraud examples and validation/test have none. Passing software tests does not establish
+fraud-detection quality on real transactions.
 
-Terraform provisions exactly five containers:
+## Supported deployment
 
-1. `traffic-generator` continuously posts synthetic transactions.
-2. `api` validates events, scales features, runs the PyTorch scorer, exposes
-   Prometheus metrics, and sends every prediction to the audit service.
-3. `audit-store` persists predictions in a SQLite database.
-4. `prometheus` scrapes the API metrics endpoint.
-5. `grafana` displays provisioned live prediction, fraud-rate, and latency
-   charts.
+The production target is a three-zone Kubernetes deployment with replicated API/ledger services,
+synchronous PostgreSQL replication, TLS between services and off-cluster backups. See
+[the HA deployment guide](docs/HA_DEPLOYMENT.md) for prerequisites and staged rollout.
+Compose and Terraform remain single-host development tools. Producers must be trusted and
+authenticated, sending enriched transactions.
+The API credential belongs to the trusted feature pipeline, never to a browser/mobile client.
+The service verifies UTC hour consistency and input bounds; it cannot verify historical counts
+without access to the producer's underlying transaction history. The offline Handbook preparer
+computes these features from ordered records. Integrate an authoritative online feature service
+before accepting raw live customer transactions.
 
-## Repository layout
+## Install and test
 
-```text
-.
-├── apps/
-│   ├── audit_store/            # SQLite-backed prediction audit API
-│   └── traffic_generator/      # Continuous synthetic transaction producer
-├── configs/                    # Shared application and model configuration
-├── data/
-│   ├── raw/                    # Source datasets (not committed)
-│   ├── interim/                # Validated/intermediate datasets
-│   └── processed/              # Training-ready datasets
-├── deploy/
-│   ├── docker/                 # Service Dockerfiles
-│   └── kubernetes/             # Optional Kubernetes manifests
-├── docs/                       # Architecture and operational documentation
-├── infra/terraform/
-│   ├── environments/           # dev/staging/prod root modules
-│   └── modules/                # Reusable cloud infrastructure modules
-├── monitoring/                 # Prometheus and Grafana configuration
-├── notebooks/                  # Exploratory analysis and experiments
-├── scripts/                    # Data, training, and local operations scripts
-├── src/fraud_detector/         # Shared Python package
-├── tests/                      # Unit, integration, and contract tests
-├── docker-compose.yml          # Local five-container development stack
-├── pyproject.toml              # Python tooling and dependencies
-└── .env.example                # Local configuration template
-```
-
-## Getting started
-
-1. Copy `.env.example` to `.env` and adjust local values.
-2. Start the five-container local stack with `docker compose up --build`.
-3. Open the API at `http://localhost:8000/docs`, Prometheus at
-   `http://localhost:9090`, and Grafana at `http://localhost:3000`.
-4. To provision the same five-container topology with Terraform:
-   `cd infra/terraform/environments/dev && terraform init && terraform apply`.
-
-Terraform resolves the project root to an absolute path for Docker bind mounts.
-The root `.dockerignore` excludes local virtual environments, Terraform state,
-and generated caches so Docker image builds remain small and reliable.
-Grafana mounts only its provisioning and dashboard directories, preserving the
-image's built-in configuration and startup paths.
-
-Before starting the Compose stack, prepare the replay file:
+Use Python 3.10 and a virtual environment. From this project directory:
 
 ```bash
-.venv/bin/python scripts/prepare_dataset.py data/raw/*.pkl \
-  --output-dir data/processed
+python -m pip install --no-deps --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
+python -m pip install -c constraints.txt -e '.[dev,data]'
+python -m pytest -q
+python -m ruff check src apps scripts tests
 ```
 
-The traffic generator runs in `handbook` mode by default, replays
-`data/processed/handbook/replay.jsonl` at four events per second, preserves
-source timestamps, and prefixes transaction IDs with the configured replay run
-ID (for example, `run001:123`). The original source ID is retained for audit
-and evaluation mapping.
+On macOS, install PyTorch from the standard Python package index instead of the Linux CPU index.
+The constraints file pins tested packages. Docker pins its Python base by digest and uses CPU
+PyTorch. CI builds the image, runs isolated HTTP tests, and rejects HIGH/CRITICAL image findings.
 
-## Preparing the supplied dataset
+## Prepare data
 
-The ingestion pipeline reads a pandas pickle, validates required transaction
-IDs, timestamps, and positive amounts, then sorts by timestamp and transaction
-ID. It writes three deterministic artifacts:
+Prefer CSV with the Handbook columns or Parquet (install pyarrow separately for Parquet).
+Pickle files require a reviewed manifest mapping each filename to its SHA256. A checksum does
+not make an unknown pickle safe: obtain files from the official repository and verify provenance
+before recording them in the manifest. Deserialization occurs only after the hash matches.
 
 ```bash
-.venv/bin/python scripts/prepare_dataset.py \
-  data/raw/2018-04-01.pkl \
-  --output-dir data/processed
+python scripts/prepare_dataset.py data/raw/transactions.csv --output-dir data/processed
+# Verified Handbook pickle input:
+python scripts/prepare_dataset.py data/raw/*.pkl --trusted-manifest configs/trusted-data.json
 ```
 
-Multiple pickle files can be supplied together; validation and sorting are
-performed across the combined dataset:
+Preparation validates IDs, binary labels, finite amounts and API bounds. It calculates features
+once across all days, writes all features for training, and writes only the chronological test
+partition to `data/processed/handbook/replay.jsonl`, with matching `test_labels.csv`.
+The hourly window includes preceding events exactly one hour earlier. Ties follow deterministic
+transaction ID order; the current event is excluded. Late events are rejected by the feature
+calculator. Source timestamps lacking a timezone are interpreted as UTC by the Handbook importer.
+
+## Train and approve an artifact
+
+Copy `configs/release-policy.example.json` to a reviewed policy. Its thresholds are examples,
+not validated business requirements. Choose acceptable precision/recall and required fraud counts
+for your application. Obtain enough labeled days for all chronological partitions.
 
 ```bash
-.venv/bin/python scripts/prepare_dataset.py data/raw/*.pkl \
-  --output-dir data/processed
+python scripts/train.py --input data/processed/training_features.csv \
+  --output models/artifacts/candidate.pt --policy configs/release-policy.json
 ```
 
-The shared feature handbook in
-[`src/fraud_detector/features/handbook.py`](/Users/cameron/DS_projects/ds_projects/financial_anomaly_/src/fraud_detector/features/handbook.py)
-calculates `amount`, `transactions_last_hour`, `customer_history_days`, and
-`hour_of_day` point-in-time. Customer history state is retained while multiple
-daily files are processed, so replay does not reset at a file boundary.
+Training rejects insufficient/single-class splits, fits normalization on training only, uses
+minibatches, selects the threshold on validation, and gates export on test metrics. Equal timestamps
+stay in the same partition. Reports include class counts, source/policy hashes and a unique version.
+The output is a model, report, and SHA256 sidecar. Use new output filenames for each candidate;
+review the report before copying an accepted candidate to `models/artifacts/fraud_model.pt`.
+Do not repeatedly tune against the same test set. Synthetic evaluation does not establish
+performance on a different real-world population; require a representative shadow evaluation.
+The reported sigmoid is a model score, not a demonstrated calibrated probability.
 
-## Training the model
-
-Train the classifier after preparing the feature table:
+## Configure and start the local stack
 
 ```bash
-.venv/bin/python scripts/train.py \
-  --input data/processed/training_features.csv \
-  --output models/artifacts/fraud_model.pt
+python scripts/init_secrets.py
+cp .env.example .env
 ```
 
-Training uses chronological 70/15/15 train, validation, and test periods.
-Normalization parameters are fitted only on the training period. The exported
-artifact contains model weights, feature order, normalization parameters,
-validation-selected threshold, model version, and test metrics. The API loads
-this artifact at prediction time rather than using hard-coded weights or a
-fixed decision threshold.
-
-- `records.csv`: validated source records
-- `training_features.csv`: numeric training table with fraud labels
-- `replay_events.jsonl`: API-compatible events in replay order
-
-Place additional source pickle files in `data/raw/`; each file can be prepared
-with the same command and its outputs written to a separate processed
-directory.
-
-The Compose project name and locally built image tags are explicitly pinned, so
-the stack can also be run from directories whose names contain underscores or
-trailing separators.
-
-The initial tree is intentionally scaffolded so model architecture, event
-transport, persistence, and cloud-provider-specific Terraform can be added
-without moving public interfaces.
-
-## End-to-end data and prediction flow
-
-The platform follows a deterministic pipeline from raw transaction data to
-live predictions and audit trail:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Handbook Dataset (pickle)                                        │
-│   - Raw transactions with labels, amounts, timestamps            │
-└────────────────────┬────────────────────────────────────────────┘
-                     │
-                     ├────────────────────────────────────────┐
-                     v                                        │
-        ┌────────────────────────────┐                        │
-        │ 1. Data Preparation        │                        │
-        │  (prepare_dataset.py)      │                        │
-        ├────────────────────────────┤                        │
-        │ ✓ Validate records         │                        │
-        │ ✓ Sort by timestamp + ID   │                        │
-        │ ✓ Calculate features       │                        │
-        │ ✓ Split chronologically    │                        │
-        └──┬───────────────────────┬─┘                        │
-           │                       │                          │
-           ├─→ records.csv         │                          │
-           └─→ training_features.csv                          │
-                                   │                          │
-        ┌──────────────────────────┴─────┐                    │
-        │  2a. Model Training            │                    │
-        │  (train.py)                    │                    │
-        ├────────────────────────────────┤                    │
-        │ Train (70%):                   │                    │
-        │  ├─ Fit normalization          │                    │
-        │  └─ Train PyTorch MLP          │                    │
-        │                                │                    │
-        │ Validation (15%):              │                    │
-        │  └─ Threshold selection (F1)   │                    │
-        │                                │                    │
-        │ Test (15%):                    │                    │
-        │  └─ Precision, Recall, AP      │                    │
-        └──┬─────────────────────────────┘                    │
-           │                                                  │
-           v                                                  │
-        ┌───────────────────────────────┐                     │
-        │ fraud_model.pt (artifact)     │                     │
-        │ - Model weights               │                     │
-        │ - Normalization params        │                     │
-        │ - Decision threshold          │                     │
-        │ - Version info                │                     │
-        └────────────────────────────────┘                    │
-                                                              │
-        ┌──────────────────────────────────┐                 │
-        │ 2b. Replay Events Preparation   │◄────────────────┘
-        │ (prepare_dataset.py)             │
-        ├──────────────────────────────────┤
-        │ ✓ Test set → JSONL format        │
-        │ ✓ Preserve source transaction_id │
-        │ ✓ Point-in-time features         │
-        └──┬───────────────────────────────┘
-           │
-           v
-        ┌─────────────────────────┐
-        │ replay.jsonl (9,488     │
-        │ test transactions)      │
-        └─────────┬───────────────┘
-                  │
-                  │ docker compose up
-                  ├─────────────────────────────────────────┐
-                  │                                         │
-        ┌─────────v──────────────┐              ┌──────────v──────────────┐
-        │ 3. Traffic Generator   │              │ 4. Fraud Detection API │
-        │ (traffic_generator.py) │─HTTP POST──→ │ (api.py)               │
-        ├────────────────────────┤              ├───────────────────────┤
-        │ Replay mode:           │              │ ✓ Parse transaction  │
-        │ ├─ Read replay.jsonl   │              │ ✓ Calculate features │
-        │ ├─ Post @4 events/sec  │              │ ✓ Apply normalization│
-        │ ├─ Prefix IDs with run_id              │ ✓ Score with model   │
-        │ └─ Preserve timestamps │              │ ✓ Apply threshold    │
-        │                        │              │ ✓ Emit Prometheus    │
-        │ (run_id=run001)        │              │ ✓ Send to audit store│
-        └────────────────────────┘              └──────────┬────────────┘
-                                                          │
-                                        ┌─────────────────┴────────────────┐
-                                        │                                  │
-                                        v                                  v
-                    ┌────────────────────────────┐       ┌──────────────────────┐
-                    │ 5. Audit Store (SQLite)    │       │ 6. Prometheus        │
-                    ├────────────────────────────┤       ├──────────────────────┤
-                    │ Every prediction logged:   │       │ ✓ Prediction count   │
-                    │ ├─ transaction_id          │       │ ✓ Fraud rate         │
-                    │ ├─ source_transaction_id   │       │ ✓ Prediction latency │
-                    │ ├─ timestamp               │       │ ✓ Model version      │
-                    │ ├─ fraud_probability       │       └──────────┬───────────┘
-                    │ ├─ is_fraud                │                  │
-                    │ └─ model_version           │                  v
-                    └────────────────────────────┘       ┌────────────────────────┐
-                                                         │ 7. Grafana Dashboards  │
-                                                         ├────────────────────────┤
-                                                         │ ✓ Fraud rate timeline  │
-                                                         │ ✓ Prediction latency   │
-                                                         │ ✓ Model version track  │
-                                                         │ ✓ Live metrics         │
-                                                         └────────────────────────┘
-```
-
-### 1. Dataset Preparation (`data/processed/`)
-
-Ingests raw pickle files, validates unique transaction IDs and positive
-amounts, sorts chronologically, and outputs three deterministic artifacts:
-
-- **`records.csv`**: validated source transactions
-- **`training_features.csv`**: numerical feature table with labels
-- **`handbook/replay.jsonl`**: API-compatible test events in order
-
-Feature calculation uses [`handbook.py`](/Users/cameron/DS_projects/ds_projects/financial_anomaly_/src/fraud_detector/features/handbook.py):
-all features are computed **before** adding the current transaction to the
-customer history state. This ensures point-in-time consistency across training
-and inference.
-
-### 2. Model Training (`models/artifacts/fraud_model.pt`)
-
-Training pipeline:
-
-- **Chronological split**: 70% training, 15% validation, 15% test
-- **Normalization**: fitted **only** on training period to prevent leakage
-- **Model**: 2-layer PyTorch MLP with BCE loss and `pos_weight` for imbalance
-- **Threshold selection**: selected on validation period to maximize F1 score
-- **Artifact export**: weights, normalization params, threshold, version
-
-### 3. Replay and Live Inference
-
-- **Traffic generator** reads `replay.jsonl`, posts test transactions at 4
-  events/second.
-- **ID prefixing**: transaction IDs are prefixed with run ID (e.g.,
-  `run001:123`) to allow multiple replays without audit duplicates.
-- **Source preservation**: original `source_transaction_id` is retained for
-  evaluation mapping back to test labels.
-
-### 4. Audit and Evaluation
-
-Every prediction is persisted with:
-
-- `transaction_id`: prefixed ID (e.g., `run001:123`)
-- `source_transaction_id`: original ID (e.g., `123`) for evaluation join
-- `fraud_probability`: model output
-- `is_fraud`: thresholded decision
-- `model_version`: artifact version for multimodel tracking
-
-Join predictions back to held-out test labels using `source_transaction_id` to
-compute precision, recall, and average precision on unseen data.
-
-## Running the complete flow
-
-### Step 1: Prepare the dataset
+Set `MODEL_SHA256` in `.env` to the approved artifact's SHA256. The API verifies both this hash and
+its embedded release approval at startup. Secret files stay outside Git/images. Distinct bearer
+keys protect prediction ingestion, audit writes, audit reads and metrics. Grafana has its own
+password. To rotate keys, replace the files and restart all affected services together.
 
 ```bash
-.venv/bin/python scripts/prepare_dataset.py data/raw/2018-04-01.pkl \
-  --output-dir data/processed
+docker compose up --build -d
+# Explicit finite replay; progress survives container recreation:
+docker compose --profile replay up --build traffic-generator
 ```
 
-Validates 9,488 transactions, creates deterministic artifacts.
+API, Grafana, and Prometheus host ports bind only to loopback. The audit service has no host port.
+All application containers run as UID 10001 with read-only roots, dropped capabilities and resource
+limits. The internal backend network carries service traffic. Secrets files are read-only inside
+containers; restrict host directory access and encrypt the host disk/backups where required.
 
-### Step 2: Train the model
+To deliberately run a new replay, use a new checkpoint path or a new replay-state volume.
+Do not erase the current checkpoint to recover a transient failure. The same request ID and body
+return the original persisted result, even across model changes. Reusing an ID with different
+input returns 409. Permanent errors stop replay; transient failures get six bounded attempts.
+
+For an external trusted producer, set `PUBLIC_HOST` to your DNS name and use
+`docker compose --profile public up -d`. The optional Caddy gateway provisions TLS and exposes
+only `/predict`; configure DNS/firewall first. Never expose audit/metrics/Grafana directly.
+Terraform provisions the private single-host stack with equivalent aliases and secret mounts:
 
 ```bash
-.venv/bin/python scripts/train.py \
-  --input data/processed/training_features.csv \
-  --output models/artifacts/fraud_model.pt
+terraform -chdir=infra/terraform/environments/dev init
+terraform -chdir=infra/terraform/environments/dev validate
+terraform -chdir=infra/terraform/environments/dev plan -var='model_sha256=APPROVED_SHA256'
 ```
 
-Exports model weights, normalization, threshold, and version.
+Terraform does not create cloud machines or public TLS infrastructure. Do not run Compose and
+Terraform against the same deployment. Review the plan before apply.
 
-### Step 3: Start the runtime stack
-
-```bash
-docker compose up --build
-```
-
-Launches five containers:
-- API listening at `http://localhost:8000`
-- Audit store at `http://localhost:8001`
-- Prometheus at `http://localhost:9090`
-- Grafana at `http://localhost:3000`
-- Traffic generator replaying 9,488 test transactions
-
-### Step 4: Monitor
-
-Open Grafana at `http://localhost:3000`:
-- **Fraud Detection Rate**: live fraud probability distribution
-- **Prediction Latency**: API response time histogram
-- **Model Version**: currently deployed artifact version
-
-Open `http://localhost:8001/predictions` to inspect the audit trail.
-
-### Step 5: Evaluate (post-replay)
-
-After replay completes (~40 minutes at 4 events/second), join predictions to
-test labels:
-
-```python
-import pandas as pd
-import sqlite3
-
-# Audit store predictions
-with sqlite3.connect("path/to/audit.db") as conn:
-    predictions = pd.read_sql(
-        "SELECT source_transaction_id, fraud_probability, is_fraud FROM predictions",
-        conn
-    )
-
-# Test labels
-test_labels = pd.read_csv("data/processed/training_features.csv")
-test_labels = test_labels.iloc[int(0.85 * len(test_labels)):]
-
-# Join and evaluate
-joined = test_labels.merge(
-    predictions, 
-    left_on="transaction_id",
-    right_on="source_transaction_id",
-    how="inner"
-)
-
-# Metrics
-precision = ((joined["is_fraud"] == True) & (joined["is_fraud_pred"] == True)).sum() / (joined["is_fraud_pred"] == True).sum()
-recall = ((joined["is_fraud"] == True) & (joined["is_fraud_pred"] == True)).sum() / (joined["is_fraud"] == True).sum()
-print(f"Precision: {precision:.3f}, Recall: {recall:.3f}")
-```
-
-## Testing
-
-Run all tests (unit + integration):
-
-```bash
-.venv/bin/pytest tests/ -v
-```
-
-Integration test validates the complete flow:
-- Dataset artifacts are consistent
-- Training split is chronological
-- Model artifact loads and predicts
-- Audit records are traceable to source transactions
-
+See [operations and release requirements](docs/PRODUCTION_RUNBOOK.md) for migration, backup,
+retention, alerts, replay evaluation, rollout and remaining acceptance work.

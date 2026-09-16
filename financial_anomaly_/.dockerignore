@@ -24,3 +24,11 @@ models/artifacts/*
 !models/artifacts/*.json
 notebooks
 tests
+
+secrets
+backups
+data
+models
+*.db
+*.db-wal
+*.db-shm

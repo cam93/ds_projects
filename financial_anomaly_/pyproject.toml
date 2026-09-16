@@ -5,16 +5,20 @@ description = "Realtime financial transaction fraud detection platform"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115,<1",
-    "pandas>=2.2,<3",
+    "httpx>=0.28,<1",
+    "psycopg[binary,pool]>=3.3,<4",
+    "anyio>=4,<5",
     "prometheus-client>=0.21,<1",
     "pydantic>=2.9,<3",
     "torch>=2.5,<3",
-    "uvicorn[standard]>=0.32,<1",
+    "uvicorn>=0.32,<1",
 ]
 
 [project.optional-dependencies]
+data = ["pandas>=2.2,<3", "numpy>=2,<3"]
 dev = [
-    "httpx>=0.27,<1",
+    "pandas>=2.2,<3",
+    "numpy>=2,<3",
     "pytest>=8.3,<9",
     "pytest-cov>=6,<7",
     "ruff>=0.8,<1",
@@ -30,3 +34,11 @@ pythonpath = ["src", "apps", "scripts", "."]
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"
 ]
+
+[build-system]
+requires = ["setuptools==84.0.0", "wheel==0.46.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["fraud_detector", "fraud_detector.features", "fraud_detector.model", "fraud_detector.config", "apps", "apps.audit_store", "apps.traffic_generator"]
+package-dir = {fraud_detector = "src/fraud_detector", apps = "apps"}

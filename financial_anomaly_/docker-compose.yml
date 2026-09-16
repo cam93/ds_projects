@@ -1,86 +1,141 @@
 name: realtime-fraud-detector
 
-services:
-  traffic-generator:
-    image: realtime-fraud-detector-traffic-generator:dev
-    build:
-      context: .
-      dockerfile: deploy/docker/traffic-generator.Dockerfile
-    environment:
-      TRAFFIC_TARGET_URL: http://api:8000
-      TRAFFIC_INTERVAL_SECONDS: 0.25
-      TRAFFIC_SOURCE: handbook
-      TRAFFIC_DATA_PATH: /data/replay.jsonl
-      TRAFFIC_REPLAY_RUN_ID: run001
-    volumes:
-      - ./data/processed/handbook:/data:ro
-    depends_on:
-      api:
-        condition: service_healthy
+x-hardening: &hardening
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  mem_limit: 1g
+  cpus: 2
+  tmpfs: ['/tmp:size=64m,mode=1777']
+  logging:
+    driver: json-file
+    options: {max-size: 10m, max-file: '3'}
 
+services:
   api:
-    image: realtime-fraud-detector-api:dev
-    build:
-      context: .
-      dockerfile: deploy/docker/api.Dockerfile
+    <<: *hardening
+    build: {context: ., dockerfile: deploy/docker/api.Dockerfile}
     environment:
+      APP_ENV: production
+      MODEL_PATH: /models/fraud_model.pt
+      MODEL_SHA256: ${MODEL_SHA256:?Set checksum of an approved model}
       AUDIT_SERVICE_URL: http://audit-store:8001
-      MODEL_PATH: /app/models/artifacts/fraud_model.pt
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./models/artifacts:/app/models/artifacts:ro
+      API_KEY_FILE: /run/secrets/api_key
+      AUDIT_WRITE_KEY_FILE: /run/secrets/audit_write_key
+      METRICS_KEY_FILE: /run/secrets/metrics_key
+    secrets: [api_key, audit_write_key, metrics_key]
+    volumes: [./models/artifacts:/models:ro]
+    ports: [127.0.0.1:8000:8000]
+    networks: [backend, frontend]
     depends_on:
-      audit-store:
-        condition: service_healthy
+      audit-store: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   audit-store:
-    image: realtime-fraud-detector-audit-store:dev
-    build:
-      context: .
-      dockerfile: deploy/docker/audit-store.Dockerfile
+    <<: *hardening
+    build: {context: ., dockerfile: deploy/docker/audit-store.Dockerfile}
     environment:
+      APP_ENV: development
       SQLITE_PATH: /var/lib/fraud-detector/audit.db
-    volumes:
-      - audit-data:/var/lib/fraud-detector
-    ports:
-      - "8001:8001"
+      AUDIT_WRITE_KEY_FILE: /run/secrets/audit_write_key
+      AUDIT_READ_KEY_FILE: /run/secrets/audit_read_key
+    secrets: [audit_write_key, audit_read_key]
+    volumes: [audit-data:/var/lib/fraud-detector]
+    networks: [backend]
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8001/ready')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  traffic-generator:
+    <<: *hardening
+    restart: 'no'
+    profiles: [replay]
+    build: {context: ., dockerfile: deploy/docker/traffic-generator.Dockerfile}
+    environment:
+      TRAFFIC_TARGET_URL: http://api:8000
+      TRAFFIC_INTERVAL_SECONDS: ${TRAFFIC_INTERVAL_SECONDS:-0.25}
+      TRAFFIC_DATA_PATH: /data/replay.jsonl
+      TRAFFIC_CHECKPOINT_PATH: /state/checkpoint.json
+      API_KEY_FILE: /run/secrets/api_key
+    secrets: [api_key]
+    volumes: [./data/processed/handbook:/data:ro, replay-state:/state]
+    networks: [backend]
+    depends_on:
+      api: {condition: service_healthy}
 
   prometheus:
-    image: prom/prometheus:v2.55.1
-    ports:
-      - "9090:9090"
+    <<: *hardening
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=15d, --storage.tsdb.retention.size=2GB]
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    depends_on:
-      api:
-        condition: service_healthy
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    secrets: [metrics_key]
+    ports: [127.0.0.1:9090:9090]
+    networks: [backend]
 
   grafana:
+    <<: *hardening
+    image: grafana/grafana:13.2.2@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0
     environment:
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
-      GF_DASHBOARDS_JSON_ENABLED: "true"
-      GF_DISABLE_LOGIN_FORM: "true"
-      GF_DASHBOARDS_JSON_PATH: /var/lib/grafana/dashboards
-    image: grafana/grafana:11.3.1
-    ports:
-      - "3000:3000"
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_AUTH_DISABLE_LOGIN_FORM: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+    secrets: [grafana_password]
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    depends_on:
-      - prometheus
+      - grafana-data:/var/lib/grafana
+    ports: [127.0.0.1:3000:3000]
+    networks: [backend]
 
+  gateway:
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    profiles: [public]
+    restart: unless-stopped
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 1
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [frontend]
+    depends_on:
+      api: {condition: service_healthy}
+
+secrets:
+  api_key: {file: ./secrets/api_key}
+  audit_write_key: {file: ./secrets/audit_write_key}
+  audit_read_key: {file: ./secrets/audit_read_key}
+  metrics_key: {file: ./secrets/metrics_key}
+  grafana_password: {file: ./secrets/grafana_password}
+networks:
+  backend: {internal: true}
+  frontend: {}
 volumes:
-  audit-data:
+  audit-data: {}
+  replay-state: {}
+  prometheus-data: {}
+  grafana-data: {}
+  caddy-data: {}
+  caddy-config: {}

@@ -1,0 +1,58 @@
+[
+  {
+    "image": "fraud-detector-review:local",
+    "image_id": "sha256:2b561b29d587cdb557f68fa83ce5ca11aa4a170c1b2a5e17fc3ea9b9d042b84d",
+    "scanned_at": "2026-09-16T05:17:52.443426+00:00",
+    "scanner": "aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969",
+    "high_critical_count": 44,
+    "status_counts": {
+      "affected": 43,
+      "fix_deferred": 1
+    },
+    "report": "image-0.json"
+  },
+  {
+    "image": "prom/prometheus:v3.14.0",
+    "image_id": "sha256:deeef2470dab312d1cade441c2ed31ccbd72c8e78e2fdd51d835e0b740af2b98",
+    "scanned_at": "2026-09-16T05:17:55.057156+00:00",
+    "scanner": "aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969",
+    "high_critical_count": 6,
+    "status_counts": {
+      "fixed": 6
+    },
+    "report": "image-1.json"
+  },
+  {
+    "image": "grafana/grafana:13.2.2",
+    "image_id": "sha256:c446c4270dcd9a253979d484c258a10679a1b12ed518eef93a60341da018fd69",
+    "scanned_at": "2026-09-16T05:18:09.958081+00:00",
+    "scanner": "aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969",
+    "high_critical_count": 104,
+    "status_counts": {
+      "fixed": 104
+    },
+    "report": "image-2.json"
+  },
+  {
+    "image": "caddy:2.11.4-alpine",
+    "image_id": "sha256:6b08c1b9858ca9a7d99c1da13c3695081e0e604c6cf214ca26a7ce0e2c4fd9b4",
+    "scanned_at": "2026-09-16T05:18:10.891840+00:00",
+    "scanner": "aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969",
+    "high_critical_count": 40,
+    "status_counts": {
+      "fixed": 40
+    },
+    "report": "image-3.json"
+  },
+  {
+    "image": "postgres:17.11-alpine",
+    "image_id": "sha256:ff80089083d7365046af7f03d949a2defa14e0b09e14bd5b8f08a242291be8b2",
+    "scanned_at": "2026-09-16T05:18:14.310578+00:00",
+    "scanner": "aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969",
+    "high_critical_count": 31,
+    "status_counts": {
+      "fixed": 31
+    },
+    "report": "image-4.json"
+  }
+]

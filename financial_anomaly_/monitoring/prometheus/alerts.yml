@@ -1,0 +1,18 @@
+groups:
+  - name: fraud-service
+    rules:
+      - alert: FraudAPIUnavailable
+        expr: up{job="fraud-detector-api"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Fraud API metrics endpoint unavailable"}
+      - alert: FraudAuditFailures
+        expr: increase(fraud_audit_failures_total[5m]) > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Prediction persistence is failing"}
+      - alert: FraudHighLatency
+        expr: histogram_quantile(0.95, sum(rate(fraud_prediction_latency_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Fraud API p95 exceeds one second"}

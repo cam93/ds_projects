@@ -1,0 +1,16 @@
+{$PUBLIC_HOST} {
+    request_body {
+        max_size 16KB
+    }
+    @prediction path /predict
+    handle @prediction {
+        reverse_proxy api:8000
+    }
+    handle {
+        respond "Not found" 404
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options nosniff
+    }
+}

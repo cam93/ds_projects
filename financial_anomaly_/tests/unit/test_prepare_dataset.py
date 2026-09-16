@@ -44,7 +44,7 @@ def test_validation_rejects_duplicate_ids() -> None:
 
 
 def test_prepare_dataset_writes_three_outputs(tmp_path: Path) -> None:
-    source = tmp_path / "source.pkl"
+    source = tmp_path / "source.csv"
     pd.DataFrame(
         {
             "TRANSACTION_ID": [1],
@@ -55,7 +55,7 @@ def test_prepare_dataset_writes_three_outputs(tmp_path: Path) -> None:
             "TX_FRAUD": [0],
             "TX_FRAUD_SCENARIO": [0],
         }
-    ).to_pickle(source)
+    ).to_csv(source, index=False)
 
     output_dir = tmp_path / "processed"
     prepare_dataset(source, output_dir)

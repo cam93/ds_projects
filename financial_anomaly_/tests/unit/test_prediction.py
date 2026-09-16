@@ -13,8 +13,14 @@ def test_scorer_returns_probability(tmp_path: Path) -> None:
     artifact_path = tmp_path / "fraud_model.pt"
     export_artifact(
         model,
-        {name: 0.0 for name in ("amount", "transactions_last_hour", "customer_history_days", "hour_of_day")},
-        {name: 1.0 for name in ("amount", "transactions_last_hour", "customer_history_days", "hour_of_day")},
+        {
+            name: 0.0
+            for name in ("amount", "transactions_last_hour", "customer_history_days", "hour_of_day")
+        },
+        {
+            name: 1.0
+            for name in ("amount", "transactions_last_hour", "customer_history_days", "hour_of_day")
+        },
         0.5,
         {},
         artifact_path,
@@ -26,7 +32,7 @@ def test_scorer_returns_probability(tmp_path: Path) -> None:
         amount=100.0,
         transactions_last_hour=2,
         customer_history_days=365,
-        hour_of_day=12,
+        hour_of_day=datetime.now(timezone.utc).hour,
         timestamp=datetime.now(timezone.utc),
     )
     probability, is_fraud = FraudScorer(artifact_path).predict(transaction)

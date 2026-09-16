@@ -1,0 +1,42 @@
+name: Fraud detector verification
+on:
+  pull_request:
+    paths: ['financial_anomaly_/**', '.github/workflows/financial-anomaly.yml']
+  push:
+    paths: ['financial_anomaly_/**', '.github/workflows/financial-anomaly.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: financial_anomaly_
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install constrained dependencies
+        run: |
+          python -m pip install --no-deps --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
+          python -m pip install -c constraints.txt -e '.[dev,data]'
+      - run: python -m ruff check src apps scripts tests
+      - run: python -m ruff format --check src apps scripts tests
+      - run: python -m pytest --cov=src --cov=apps --cov-report=term-missing
+      - run: docker build -f deploy/docker/api.Dockerfile -t fraud-detector-review:local .
+      - run: python scripts/smoke_containers.py
+      - run: python scripts/smoke_postgres.py
+      - run: python scripts/smoke_compose.py
+      - name: Scan image dependencies and OS packages
+        run: python scripts/security_scan.py --image fraud-detector-review:local
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: image-security-reports
+          path: financial_anomaly_/reports/security/
+      - name: Validate Compose
+        env:
+          MODEL_SHA256: '0000000000000000000000000000000000000000000000000000000000000000'
+        run: docker compose config --quiet

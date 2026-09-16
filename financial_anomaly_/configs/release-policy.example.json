@@ -1,0 +1,7 @@
+{
+  "min_positive_per_split": 100,
+  "min_negative_per_split": 1000,
+  "min_precision": 0.80,
+  "min_recall": 0.80,
+  "min_average_precision": 0.80
+}

@@ -27,3 +27,12 @@ models/artifacts/*
 dist/
 build/
 *.egg-info/
+
+secrets/
+*.db
+*.db-shm
+*.db-wal
+backups/
+
+reports/security/image-*.json
+deploy/kubernetes/rendered/

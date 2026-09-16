@@ -2,7 +2,7 @@
 
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 FEATURE_NAMES = [
     "amount",
@@ -28,8 +28,13 @@ def calculate_features(
     state: FeatureState,
 ) -> dict[str, float]:
     """Calculate features before recording the current transaction in history."""
+    if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+        raise ValueError("Timestamp must be timezone aware")
+    timestamp = timestamp.astimezone(timezone.utc)
     first_seen = state.first_seen.get(customer_id)
     history = state.recent_transactions.setdefault(customer_id, deque())
+    if history and timestamp < history[-1]:
+        raise ValueError("Out-of-order customer transaction")
     cutoff = timestamp - timedelta(hours=1)
     while history and history[0] < cutoff:
         history.popleft()

@@ -1,14 +1,18 @@
 """Validate and materialize the fraud-simulation dataset."""
 
 import argparse
+import hashlib
+import io
 import json
 import math
 from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
+from train import split_by_time
 
 from fraud_detector.features.handbook import FEATURE_NAMES, FeatureState, calculate_features
+from fraud_detector.schemas import Transaction
 
 REQUIRED_COLUMNS = (
     "TRANSACTION_ID",
@@ -26,17 +30,28 @@ def validate_and_sort(records: pd.DataFrame) -> pd.DataFrame:
     if missing_columns:
         raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
 
+    if records.empty:
+        raise ValueError("Dataset is empty")
     prepared = records.copy()
+    for name in ("TRANSACTION_ID", "CUSTOMER_ID", "TERMINAL_ID"):
+        prepared[name] = prepared[name].astype("string")
+        if (
+            prepared[name].isna().any()
+            or not prepared[name].str.fullmatch(r"[A-Za-z0-9_.:-]{1,96}").all()
+        ):
+            raise ValueError(f"Invalid {name}")
+    for name, allowed in (("TX_FRAUD", [0, 1]), ("TX_FRAUD_SCENARIO", [0, 1, 2, 3])):
+        prepared[name] = pd.to_numeric(prepared[name], errors="raise")
+        if not prepared[name].isin(allowed).all():
+            raise ValueError(f"Invalid {name}")
+    if prepared["TX_AMOUNT"].apply(lambda v: isinstance(v, bool)).any():
+        raise ValueError("Amounts cannot be booleans")
     prepared["TRANSACTION_ID"] = prepared["TRANSACTION_ID"].astype("string")
-    prepared["TX_DATETIME"] = pd.to_datetime(
-        prepared["TX_DATETIME"], errors="coerce", utc=True
-    )
+    prepared["TX_DATETIME"] = pd.to_datetime(prepared["TX_DATETIME"], errors="coerce", utc=True)
     prepared["TX_AMOUNT"] = pd.to_numeric(prepared["TX_AMOUNT"], errors="coerce")
 
     errors: list[str] = []
-    if prepared["TRANSACTION_ID"].isna().any() or (
-        prepared["TRANSACTION_ID"].str.len() == 0
-    ).any():
+    if prepared["TRANSACTION_ID"].isna().any() or (prepared["TRANSACTION_ID"].str.len() == 0).any():
         errors.append("transaction IDs must be non-empty")
     if prepared["TRANSACTION_ID"].duplicated().any():
         errors.append("transaction IDs must be unique")
@@ -48,6 +63,8 @@ def validate_and_sort(records: pd.DataFrame) -> pd.DataFrame:
         errors.append("amounts must be finite")
     if (~prepared["TX_AMOUNT"].gt(0)).any():
         errors.append("amounts must be positive")
+    if prepared["TX_AMOUNT"].gt(1_000_000).any():
+        errors.append("amount exceeds API limit")
     if errors:
         raise ValueError("Dataset validation failed: " + "; ".join(errors))
 
@@ -68,9 +85,9 @@ def build_training_features(records: pd.DataFrame) -> pd.DataFrame:
             "terminal_id": records["TERMINAL_ID"].astype("string"),
             **online_features,
             "is_fraud": pd.to_numeric(records["TX_FRAUD"], errors="raise").astype("int64"),
-            "fraud_scenario": pd.to_numeric(
-                records["TX_FRAUD_SCENARIO"], errors="raise"
-            ).astype("int64"),
+            "fraud_scenario": pd.to_numeric(records["TX_FRAUD_SCENARIO"], errors="raise").astype(
+                "int64"
+            ),
         }
     )
 
@@ -103,8 +120,12 @@ def build_replay_events(records: pd.DataFrame) -> list[dict[str, object]]:
                 "customer_id": str(record.CUSTOMER_ID),
                 "terminal_id": str(record.TERMINAL_ID),
                 "amount": float(record.TX_AMOUNT),
-                "transactions_last_hour": int(online_features.iloc[position]["transactions_last_hour"]),
-                "customer_history_days": float(online_features.iloc[position]["customer_history_days"]),
+                "transactions_last_hour": int(
+                    online_features.iloc[position]["transactions_last_hour"]
+                ),
+                "customer_history_days": float(
+                    online_features.iloc[position]["customer_history_days"]
+                ),
                 "hour_of_day": int(online_features.iloc[position]["hour_of_day"]),
                 "timestamp": timestamp,
             }
@@ -114,27 +135,61 @@ def build_replay_events(records: pd.DataFrame) -> list[dict[str, object]]:
 
 def write_outputs(records: pd.DataFrame, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    canonical_records = records.copy()
-    canonical_records["TX_DATETIME"] = canonical_records["TX_DATETIME"].dt.strftime(
-        "%Y-%m-%dT%H:%M:%S.%fZ"
-    )
-    canonical_records.to_csv(output_dir / "records.csv", index=False)
-    build_training_features(records).to_csv(
-        output_dir / "training_features.csv", index=False
-    )
-    with (output_dir / "replay_events.jsonl").open("w", encoding="utf-8") as replay_file:
-        for event in build_replay_events(records):
-            replay_file.write(json.dumps(event, separators=(",", ":")) + "\n")
-    handbook_dir = output_dir / "handbook"
-    handbook_dir.mkdir(exist_ok=True)
-    (handbook_dir / "replay.jsonl").write_text(
-        (output_dir / "replay_events.jsonl").read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
+    features = build_training_features(records)
+    records.to_csv(output_dir / "records.csv", index=False)
+    features.to_csv(output_dir / "training_features.csv", index=False)
+    # Preserve leading-zero IDs and calculate history once across all partitions.
+    if len(features.timestamp.unique()) >= 7:
+        _, _, test = split_by_time(features)
+    else:
+        test = features.iloc[0:0]
+    test_ids = set(test.transaction_id)
+    handbook = output_dir / "handbook"
+    handbook.mkdir(exist_ok=True)
+    test[["transaction_id", "is_fraud"]].to_csv(handbook / "test_labels.csv", index=False)
+    with (
+        (output_dir / "replay_events.jsonl").open("w") as all_file,
+        (handbook / "replay.jsonl").open("w") as test_file,
+    ):
+        for row in features.itertuples(index=False):
+            event = Transaction(
+                transaction_id=str(row.transaction_id),
+                customer_id=str(row.customer_id),
+                terminal_id=str(row.terminal_id),
+                amount=float(row.amount),
+                transactions_last_hour=int(row.transactions_last_hour),
+                customer_history_days=float(row.customer_history_days),
+                hour_of_day=int(row.hour_of_day),
+                timestamp=row.timestamp,
+            )
+            line = event.model_dump_json(exclude_none=True) + "\n"
+            all_file.write(line)
+            if row.transaction_id in test_ids:
+                test_file.write(line)
 
 
-def prepare_dataset(input_path: Path, output_dir: Path) -> pd.DataFrame:
-    records = pd.read_pickle(input_path)
+def read_source(path: Path, trusted_manifest: dict | None = None) -> pd.DataFrame:
+    if path.suffix.lower() == ".csv":
+        return pd.read_csv(
+            path, dtype={name: str for name in ("TRANSACTION_ID", "CUSTOMER_ID", "TERMINAL_ID")}
+        )
+    if path.suffix.lower() == ".parquet":
+        return pd.read_parquet(path)
+    if path.suffix.lower() == ".pkl":
+        expected = (trusted_manifest or {}).get(path.name)
+        contents = path.read_bytes()
+        if not expected or hashlib.sha256(contents).hexdigest() != expected:
+            raise ValueError(
+                "Pickle requires a verified SHA256 in --trusted-manifest before deserialization"
+            )
+        return pd.read_pickle(io.BytesIO(contents))
+    raise ValueError("Supported inputs: CSV, Parquet, verified pickle")
+
+
+def prepare_dataset(
+    input_path: Path, output_dir: Path, trusted_manifest: dict | None = None
+) -> pd.DataFrame:
+    records = read_source(input_path, trusted_manifest)
     if not isinstance(records, pd.DataFrame):
         raise TypeError(f"Expected a pandas DataFrame, got {type(records).__name__}")
     prepared = validate_and_sort(records)
@@ -142,11 +197,13 @@ def prepare_dataset(input_path: Path, output_dir: Path) -> pd.DataFrame:
     return prepared
 
 
-def prepare_pickles(input_paths: Sequence[Path], output_dir: Path) -> pd.DataFrame:
+def prepare_pickles(
+    input_paths: Sequence[Path], output_dir: Path, trusted_manifest: dict | None = None
+) -> pd.DataFrame:
     """Read and combine one or more pickle files before global validation."""
     frames = []
     for input_path in input_paths:
-        records = pd.read_pickle(input_path)
+        records = read_source(input_path, trusted_manifest)
         if not isinstance(records, pd.DataFrame):
             raise TypeError(f"Expected a pandas DataFrame, got {type(records).__name__}")
         frames.append(records)
@@ -171,12 +228,18 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
         default=Path("data/processed"),
         help="Directory for records, training features, and replay events",
     )
+    parser.add_argument(
+        "--trusted-manifest",
+        type=Path,
+        help="Reviewed mapping of pickle filenames to trusted SHA256 digests",
+    )
     return parser.parse_args(arguments)
 
 
 def main() -> None:
     args = parse_args()
-    prepared = prepare_pickles(args.input_paths, args.output_dir)
+    manifest = json.loads(args.trusted_manifest.read_text()) if args.trusted_manifest else None
+    prepared = prepare_pickles(args.input_paths, args.output_dir, manifest)
     print(f"Validated and saved {len(prepared)} records to {args.output_dir}")
 
 
