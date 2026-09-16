@@ -24,7 +24,7 @@ locals {
   services = {
     api = {
       dockerfile = "api.Dockerfile"
-      env        = ["APP_ENV=production", "MODEL_PATH=/models/fraud_model.pt", "MODEL_SHA256=${var.model_sha256}", "AUDIT_SERVICE_URL=http://audit-store:8001", "API_KEY_FILE=/run/secrets/api_key", "AUDIT_WRITE_KEY_FILE=/run/secrets/audit_write_key", "METRICS_KEY_FILE=/run/secrets/metrics_key"]
+      env        = ["APP_ENV=${var.environment == "dev" ? "development" : "production"}", "MODEL_PATH=/models/fraud_model.pt", "MODEL_SHA256=${var.model_sha256}", "AUDIT_SERVICE_URL=http://audit-store:8001", "API_KEY_FILE=/run/secrets/api_key", "AUDIT_WRITE_KEY_FILE=/run/secrets/audit_write_key", "METRICS_KEY_FILE=/run/secrets/metrics_key"]
       secrets    = ["api_key", "audit_write_key", "metrics_key"]
     }
     audit-store = {

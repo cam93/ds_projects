@@ -118,5 +118,15 @@ terraform -chdir=infra/terraform/environments/dev plan -var='model_sha256=APPROV
 Terraform does not create cloud machines or public TLS infrastructure. Do not run Compose and
 Terraform against the same deployment. Review the plan before apply.
 
+The Terraform `dev` environment runs the API with `APP_ENV=development`, so a candidate model
+without release approval metadata can be exercised locally. Non-development environments run with
+production checks enabled and require an approved model artifact.
+
+Terraform can destroy only resources recorded in its state. If an apply is interrupted while an
+image is building, its container may never be added to state; inspect with
+`terraform -chdir=infra/terraform/environments/dev state list` and remove any orphaned containers
+explicitly with `docker rm -f <container-name>` before retrying. Do not use Compose and Terraform
+to manage the same container names.
+
 See [operations and release requirements](docs/PRODUCTION_RUNBOOK.md) for migration, backup,
 retention, alerts, replay evaluation, rollout and remaining acceptance work.
