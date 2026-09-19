@@ -1,0 +1,94 @@
+{
+  "threshold": 0.3458012712416522,
+  "validation": {
+    "precision": 0.010588924113900552,
+    "recall": 0.8503440366972477,
+    "average_precision": 0.32721104847178994,
+    "false_positive_rate": 0.7114932377617351,
+    "true_positive": 1483,
+    "false_positive": 138569,
+    "false_negative": 261,
+    "true_negative": 56189,
+    "roc_auc": 0.6915841808408478,
+    "scenarios": {
+      "1": {
+        "fraud_cases": 116,
+        "detected": 116,
+        "missed": 0,
+        "recall": 1.0
+      },
+      "2": {
+        "fraud_cases": 1114,
+        "detected": 865,
+        "missed": 249,
+        "recall": 0.7764811490125674
+      },
+      "3": {
+        "fraud_cases": 514,
+        "detected": 502,
+        "missed": 12,
+        "recall": 0.9766536964980544
+      }
+    },
+    "mean_daily_precision_at_100": 0.27904761904761904,
+    "fpr_95_interval": [
+      0.7094768786020277,
+      0.7135012536811495
+    ],
+    "recall_95_interval": [
+      0.8328319390781938,
+      0.8663160844040256
+    ],
+    "precision_95_interval": [
+      0.010066112297198108,
+      0.011138584101556031
+    ],
+    "false_positives_per_1000": 711.4932377617351
+  },
+  "hyperparameters": {
+    "categorical_features": "from_dtype",
+    "class_weight": "balanced",
+    "early_stopping": false,
+    "interaction_cst": null,
+    "l2_regularization": 1.0,
+    "learning_rate": 0.08,
+    "loss": "log_loss",
+    "max_bins": 255,
+    "max_depth": null,
+    "max_features": 1.0,
+    "max_iter": 150,
+    "max_leaf_nodes": 15,
+    "min_samples_leaf": 50,
+    "monotonic_cst": null,
+    "n_iter_no_change": 10,
+    "random_state": 7,
+    "scoring": "loss",
+    "tol": 1e-07,
+    "validation_fraction": 0.1,
+    "verbose": 0,
+    "warm_start": false
+  },
+  "splits": {
+    "train": {
+      "rows": 1160963,
+      "fraud": 9393,
+      "start": "2018-04-01T00:00:31+00:00",
+      "end": "2018-07-31T05:20:52+00:00"
+    },
+    "validation": {
+      "rows": 196502,
+      "fraud": 1744,
+      "start": "2018-08-07T05:20:58+00:00",
+      "end": "2018-08-27T13:14:17+00:00"
+    },
+    "test": {
+      "rows": 263045,
+      "fraud": 2330,
+      "start": "2018-09-03T13:14:22+00:00",
+      "end": "2018-09-30T23:59:57+00:00"
+    }
+  },
+  "input_sha256": "f8ae2b070a7496bbb1e87c67ac77acdf9036bee3e4b5e1c310215736938c0d40",
+  "portable_max_abs_error": 1.1102230246251565e-16,
+  "label_delay_days": 7
+}
