@@ -18,8 +18,8 @@ services:
     <<: *hardening
     build: {context: ., dockerfile: deploy/docker/api.Dockerfile}
     environment:
-      APP_ENV: production
-      MODEL_PATH: /models/fraud_model.pt
+      APP_ENV: ${APP_ENV:-production}
+      MODEL_PATH: /models/fraud_model.json
       MODEL_SHA256: ${MODEL_SHA256:?Set checksum of an approved model}
       AUDIT_SERVICE_URL: http://audit-store:8001
       API_KEY_FILE: /run/secrets/api_key

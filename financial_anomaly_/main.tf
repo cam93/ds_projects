@@ -25,7 +25,7 @@ module "fraud_detector" {
   source           = "./infra/terraform/modules/fraud_detector"
   environment      = "dev"
   project_root     = abspath(path.root)
-  model_sha256     = var.model_sha256 != null ? var.model_sha256 : filesha256("${path.root}/models/artifacts/fraud_model.pt")
+  model_sha256     = var.model_sha256 != null ? var.model_sha256 : filesha256("${path.root}/models/artifacts/fraud_model.json")
   enable_replay    = var.enable_replay
   enable_simulator = var.enable_simulator
 }

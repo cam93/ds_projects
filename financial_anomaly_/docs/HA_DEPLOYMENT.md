@@ -25,7 +25,7 @@ Do not share the backup prefix with another active cluster.
 Build the application runtime with `deploy/docker/api.Dockerfile`, scan it, publish to your
 registry, and record the registry digest. Both API and ledger code are included. Build the API
 release image using `deploy/docker/release.Dockerfile` and `--build-arg RUNTIME_IMAGE=...@sha256:...`;
-its build context must contain the approved `models/artifacts/fraud_model.pt`. Scan the final image.
+its build context must contain the approved `models/artifacts/fraud_model.json`. Scan the final image.
 The ledger uses the runtime digest. Select a CloudNativePG-compatible PostgreSQL image, not the
 plain Docker PostgreSQL image used by the local integration test.
 

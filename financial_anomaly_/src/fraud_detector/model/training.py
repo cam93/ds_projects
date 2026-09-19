@@ -191,7 +191,7 @@ def train(input_path, output_path, epochs=50, policy_path=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=Path("data/processed/training_features.csv"))
-    parser.add_argument("--output", type=Path, default=Path("models/artifacts/fraud_model.pt"))
+    parser.add_argument("--output", type=Path, default=Path("models/artifacts/candidate.pt"))
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--policy", type=Path, required=True)
     args = parser.parse_args()

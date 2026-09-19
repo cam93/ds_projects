@@ -65,7 +65,7 @@ def render(
         app_env = [env("APP_ENV", "production")]
         if name == "api":
             app_env += [
-                env("MODEL_PATH", "/models/fraud_model.pt"),
+                env("MODEL_PATH", "/models/fraud_model.json"),
                 env("MODEL_SHA256", model_hash),
                 env("AUDIT_SERVICE_URL", "https://audit-store.fraud.svc.cluster.local:8001"),
                 env("AUDIT_CA_FILE", "/run/internal-ca/ca.crt"),

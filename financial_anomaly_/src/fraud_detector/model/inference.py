@@ -22,7 +22,7 @@ class FraudScorer:
 
     def __init__(self, artifact_path: str | Path | None = None) -> None:
         self.artifact_path = Path(
-            artifact_path or os.getenv("MODEL_PATH", "models/artifacts/fraud_model.pt")
+            artifact_path or os.getenv("MODEL_PATH", "models/artifacts/fraud_model.json")
         )
         if not self.artifact_path.exists():
             raise FileNotFoundError(

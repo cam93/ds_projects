@@ -1,4 +1,4 @@
 **
 !models
 !models/artifacts
-!models/artifacts/fraud_model.pt
+!models/artifacts/fraud_model.json

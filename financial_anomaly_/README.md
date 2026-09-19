@@ -4,9 +4,12 @@ An authenticated transaction-scoring API, PostgreSQL production ledger (SQLite f
 restartable dataset replay, and private Prometheus/Grafana monitoring.
 
 **Release status: hardened implementation; model and operational acceptance still required.**
-The supplied one-day model is deliberately rejected by production startup. Its training split
-has three fraud examples and validation/test have none. Passing software tests does not establish
-fraud-detection quality on real transactions.
+The demo uses an 18-feature histogram gradient-boosted classifier. Its artifact is
+`models/artifacts/fraud_model.json`; the old four-feature MLP artifact has been removed.
+It is approved for this synthetic demo by the user, not marked production-approved. Production
+startup continues to require a separately approved artifact and representative evaluation.
+
+The active model and live API were benchmarked; see [deployment benchmark results](reports/active-model-benchmark/README.md).
 
 ## Supported deployment
 
@@ -64,7 +67,7 @@ The [rolling evaluation workflow](docs/ROBUST_EVALUATION.md) compares three popu
 chronological windows and 0.5%/0.75%/1% calibration targets. It also tests rolling spending changes
 and seven-day delayed fraud feedback. The [completed report](reports/robust-evaluation/REPORT.md)
 selected an 18-feature gradient-boosted model: final synthetic FPR 0.60%, precision 56.14%, recall
-30.78%. The candidate remains unapproved and has not replaced the deployed artifact.
+30.78%. This candidate is now the default demo artifact; it remains unapproved for production.
 
 The simulator now publishes authenticated aggregate quality metrics. Grafana shows precision,
 recall, false positives per 1,000 legitimate transactions and fraud-scenario recall by model version.
@@ -106,7 +109,7 @@ Training rejects insufficient/single-class splits, fits normalization on trainin
 minibatches, selects the threshold on validation, and gates export on test metrics. Equal timestamps
 stay in the same partition. Reports include class counts, source/policy hashes and a unique version.
 The output is a model, report, and SHA256 sidecar. Use new output filenames for each candidate;
-review the report before copying an accepted candidate to `models/artifacts/fraud_model.pt`.
+review the report before promoting a candidate. Keep PyTorch `.pt` and portable `.json` formats distinct.
 Do not repeatedly tune against the same test set. Synthetic evaluation does not establish
 performance on a different real-world population; require a representative shadow evaluation.
 The reported sigmoid is a model score, not a demonstrated calibrated probability.
@@ -154,7 +157,7 @@ terraform apply
 terraform destroy
 ```
 
-The model SHA256 is calculated automatically from `models/artifacts/fraud_model.pt`. No shell
+The model SHA256 is calculated automatically from `models/artifacts/fraud_model.json`. No shell
 hash command, `-chdir`, `-var`, or `-parallelism=1` is needed. The project-root entry point uses
 `infra/terraform/environments/dev/terraform.tfstate`, preserving the original state and resource
 addresses. Run only one Terraform operation at a time; prefer this entry point going forward.

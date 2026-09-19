@@ -1,0 +1,14 @@
+{
+  "model_versions": [
+    "robust-v2_hist_gradient_boosting-dadcc90775b3"
+  ],
+  "expected_model_version": "robust-v2_hist_gradient_boosting-dadcc90775b3",
+  "successes": 500,
+  "failures": [],
+  "elapsed_seconds": 2.6440927919902606,
+  "successful_requests_per_second": 189.1007764608897,
+  "p50_ms": 5.059958508354612,
+  "p95_ms": 5.8769892515556394,
+  "p99_ms": 6.662530506873732,
+  "method": "Sequential localhost HTTP requests including audit persistence; simulator may run concurrently. Not a saturation or HA load test."
+}

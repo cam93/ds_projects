@@ -9,7 +9,7 @@ release gates, replicated deployment manifests and backup configuration.
 
 Release blockers:
 
-- The supplied artifact has three training fraud cases and no validation/test fraud cases.
+- The demo artifact is the evaluated 18-feature gradient-boosted model. It is not production-approved.
   Production correctly rejects it. A new 90-day synthetic dataset now has 5,817 fraud cases;
   its first candidate also failed evaluation and was not promoted. See `docs/SIMULATOR.md`.
   Representative data and a reviewed passing policy remain necessary for real deployment.

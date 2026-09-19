@@ -14,6 +14,7 @@ from fraud_detector.features.adaptive import V3_FEATURE_NAMES, AdaptiveState
 from fraud_detector.features.handbook import FeatureState
 from fraud_detector.features.pipeline import enrich_transaction, prepared_transaction
 from fraud_detector.model.evaluation import split_by_time
+from fraud_detector.simulation import SimulationConfig, TransactionWorld, parse_start
 
 REQUIRED_COLUMNS = (
     "TRANSACTION_ID",
@@ -226,6 +227,20 @@ def main() -> None:
         args.input_paths, args.output_dir, manifest, args.feedback_delay_days
     )
     print(f"Validated and saved {len(prepared)} records to {args.output_dir}")
+
+
+def population(policy, seed, start="2024-01-01"):
+    config = SimulationConfig(
+        seed=seed, customers=policy["customers"], terminals=policy["terminals"]
+    )
+    world = TransactionWorld(config, parse_start(start))
+    raw = pd.DataFrame(row for day in range(policy["days"]) for row in world.day(day))
+    frame = build_training_features(validate_and_sort(raw), policy["feedback_delay_days"])
+    frame["timestamp"] = pd.to_datetime(frame.timestamp, utc=True)
+    frame["day"] = (frame.timestamp - pd.Timestamp(start, tz="UTC")).dt.total_seconds() / 86400
+    # Namespace identities before pooling independently generated customers.
+    frame["transaction_id"] = str(seed) + ":" + frame.transaction_id.astype(str)
+    return frame, config.model_dump()
 
 
 if __name__ == "__main__":

@@ -49,8 +49,9 @@ result changes the selected model, threshold or production approval.
 
 Outputs include `evaluation.json`, `selection-before-final.json`, `REPORT.md`, a portable
 `selected-model.json` and its SHA256, and local `final-predictions.csv`. The completed run's large
-prediction file is excluded from Git. Production approval remains false and the existing deployed
-model is retained. Evaluation does not deploy or change Terraform's model path.
+prediction file is excluded from Git. Production approval remains false. The selected candidate was subsequently promoted to the demo
+by user request; see [the deployment benchmark](../reports/active-model-benchmark/README.md).
+Running evaluation itself does not deploy or change Terraform's model path.
 
 ## Features and delayed feedback
 
