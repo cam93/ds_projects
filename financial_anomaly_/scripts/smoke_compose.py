@@ -3,86 +3,94 @@ import json
 import os
 import secrets
 import subprocess
-import sys
 import tempfile
 import uuid
 from pathlib import Path
 
-sys.path[:0] = ["src", "scripts"]
 import torch
-from train import export_artifact
 
 from fraud_detector.features.adaptive import AdaptiveState
 from fraud_detector.features.handbook import FEATURE_NAMES, FeatureState, calculate_features
+from fraud_detector.model.training import export_artifact
 from fraud_detector.schemas import AdaptiveFeatures, BehavioralFeatures, Transaction
 
-root = Path.cwd()
-parser = argparse.ArgumentParser(
-    description="Verify an isolated demo stack and remove it afterward"
-)
-parser.add_argument("--model", type=Path, help="Optional portable JSON candidate to verify")
-args = parser.parse_args()
-project = "fraud-compose-check-" + uuid.uuid4().hex[:8]
-with tempfile.TemporaryDirectory(prefix="fraud-compose-") as temp:
-    d = Path(temp)
-    d.chmod(0o755)
-    (d / "models").mkdir()
-    (d / "data").mkdir()
-    for key in ["api_key", "audit_write_key", "audit_read_key", "metrics_key", "grafana_password"]:
-        (d / key).write_text(secrets.token_hex(32))
-        (d / key).chmod(0o444)
-    model = torch.nn.Sequential(torch.nn.Linear(4, 8), torch.nn.ReLU(), torch.nn.Linear(8, 1))
-    export_artifact(
-        model,
-        {n: 0.0 for n in FEATURE_NAMES},
-        {n: 1.0 for n in FEATURE_NAMES},
-        0.5,
-        {},
-        d / "models/fraud_model.pt",
-    )
-    model_name = "fraud_model.pt"
-    if args.model:
-        if args.model.suffix != ".json":
-            parser.error("--model requires a portable .json artifact")
-        model_name = "candidate.json"
-        (d / "models" / model_name).write_bytes(args.model.read_bytes())
-    event = {
-        "transaction_id": "1",
-        "customer_id": "1",
-        "terminal_id": "1",
-        "amount": 10.0,
-        "transactions_last_hour": 0,
-        "customer_history_days": 0.0,
-        "hour_of_day": 12,
-        "timestamp": "2024-01-01T12:00:00Z",
-    }
-    if args.model:
-        parsed = Transaction.model_validate(event)
-        features = calculate_features(
-            customer_id=parsed.customer_id,
-            terminal_id=parsed.terminal_id,
-            amount=parsed.amount,
-            timestamp=parsed.timestamp,
-            state=FeatureState(),
-        )
-        delay = json.loads(args.model.read_text()).get("feedback_delay_days", 7)
-        adaptive = AdaptiveState(delay).observe(
-            customer_id=parsed.customer_id,
-            terminal_id=parsed.terminal_id,
-            amount=parsed.amount,
-            timestamp=parsed.timestamp,
-            outcome=0,
-        )
-        event["adaptive_features"] = AdaptiveFeatures.from_features(adaptive, delay).model_dump()
-        event["behavioral_features"] = BehavioralFeatures.from_features(features).model_dump()
-    (d / "data/replay.jsonl").write_text(json.dumps(event) + "\n")
-    import hashlib
 
-    env = {
-        **os.environ,
-        "MODEL_SHA256": hashlib.sha256((d / "models" / model_name).read_bytes()).hexdigest(),
-    }
-    override = f"""services:
+def main(argv=None):
+    root = Path.cwd()
+    parser = argparse.ArgumentParser(
+        description="Verify an isolated demo stack and remove it afterward"
+    )
+    parser.add_argument("--model", type=Path, help="Optional portable JSON candidate to verify")
+    args = parser.parse_args(argv)
+    project = "fraud-compose-check-" + uuid.uuid4().hex[:8]
+    with tempfile.TemporaryDirectory(prefix="fraud-compose-") as temp:
+        d = Path(temp)
+        d.chmod(0o755)
+        (d / "models").mkdir()
+        (d / "data").mkdir()
+        for key in [
+            "api_key",
+            "audit_write_key",
+            "audit_read_key",
+            "metrics_key",
+            "grafana_password",
+        ]:
+            (d / key).write_text(secrets.token_hex(32))
+            (d / key).chmod(0o444)
+        model = torch.nn.Sequential(torch.nn.Linear(4, 8), torch.nn.ReLU(), torch.nn.Linear(8, 1))
+        export_artifact(
+            model,
+            {n: 0.0 for n in FEATURE_NAMES},
+            {n: 1.0 for n in FEATURE_NAMES},
+            0.5,
+            {},
+            d / "models/fraud_model.pt",
+        )
+        model_name = "fraud_model.pt"
+        if args.model:
+            if args.model.suffix != ".json":
+                parser.error("--model requires a portable .json artifact")
+            model_name = "candidate.json"
+            (d / "models" / model_name).write_bytes(args.model.read_bytes())
+        event = {
+            "transaction_id": "1",
+            "customer_id": "1",
+            "terminal_id": "1",
+            "amount": 10.0,
+            "transactions_last_hour": 0,
+            "customer_history_days": 0.0,
+            "hour_of_day": 12,
+            "timestamp": "2024-01-01T12:00:00Z",
+        }
+        if args.model:
+            parsed = Transaction.model_validate(event)
+            features = calculate_features(
+                customer_id=parsed.customer_id,
+                terminal_id=parsed.terminal_id,
+                amount=parsed.amount,
+                timestamp=parsed.timestamp,
+                state=FeatureState(),
+            )
+            delay = json.loads(args.model.read_text()).get("feedback_delay_days", 7)
+            adaptive = AdaptiveState(delay).observe(
+                customer_id=parsed.customer_id,
+                terminal_id=parsed.terminal_id,
+                amount=parsed.amount,
+                timestamp=parsed.timestamp,
+                outcome=0,
+            )
+            event["adaptive_features"] = AdaptiveFeatures.from_features(
+                adaptive, delay
+            ).model_dump()
+            event["behavioral_features"] = BehavioralFeatures.from_features(features).model_dump()
+        (d / "data/replay.jsonl").write_text(json.dumps(event) + "\n")
+        import hashlib
+
+        env = {
+            **os.environ,
+            "MODEL_SHA256": hashlib.sha256((d / "models" / model_name).read_bytes()).hexdigest(),
+        }
+        override = f"""services:
   api:
     image: fraud-detector-review:local
     environment:
@@ -109,113 +117,113 @@ with tempfile.TemporaryDirectory(prefix="fraud-compose-") as temp:
     ports: !reset []
 secrets:
 """ + "".join(
-        f"  {key}: {{file: {d}/{key}}}\n"
-        for key in [
-            "api_key",
-            "audit_write_key",
-            "audit_read_key",
-            "metrics_key",
-            "grafana_password",
+            f"  {key}: {{file: {d}/{key}}}\n"
+            for key in [
+                "api_key",
+                "audit_write_key",
+                "audit_read_key",
+                "metrics_key",
+                "grafana_password",
+            ]
+        )
+        (d / "override.yml").write_text(override)
+        cmd = [
+            "docker",
+            "compose",
+            "-p",
+            project,
+            "-f",
+            str(root / "docker-compose.yml"),
+            "-f",
+            str(d / "override.yml"),
         ]
-    )
-    (d / "override.yml").write_text(override)
-    cmd = [
-        "docker",
-        "compose",
-        "-p",
-        project,
-        "-f",
-        str(root / "docker-compose.yml"),
-        "-f",
-        str(d / "override.yml"),
-    ]
 
-    def run(*args, check=True):
-        r = subprocess.run([*cmd, *args], env=env, text=True, capture_output=True, check=False)
-        if check and r.returncode:
-            print(r.stdout, r.stderr)
-            raise RuntimeError("Compose command failed")
-        return r
+        def run(*args, check=True):
+            r = subprocess.run([*cmd, *args], env=env, text=True, capture_output=True, check=False)
+            if check and r.returncode:
+                print(r.stdout, r.stderr)
+                raise RuntimeError("Compose command failed")
+            return r
 
-    try:
-        run(
-            "up",
-            "-d",
-            "--no-build",
-            "--wait",
-            "--wait-timeout",
-            "90",
-            "api",
-            "audit-store",
-            "prometheus",
-            "grafana",
-        )
-        run("--profile", "replay", "run", "--rm", "--no-deps", "traffic-generator")
-        run(
-            "--profile",
-            "simulation",
-            "run",
-            "--rm",
-            "--no-deps",
-            "simulator",
-            "python",
-            "-m",
-            "fraud_detector.simulator",
-            "stream",
-            "--seed",
-            "17",
-            "--url",
-            "http://api:8000",
-            "--state",
-            "/state/live.db",
-            "--api-key-file",
-            "/run/secrets/api_key",
-            "--count",
-            "12",
-            "--rate",
-            "10",
-        )
-        run(
-            "--profile",
-            "simulation",
-            "run",
-            "--rm",
-            "--no-deps",
-            "simulator",
-            "python",
-            "-m",
-            "fraud_detector.simulator",
-            "stream",
-            "--seed",
-            "17",
-            "--url",
-            "http://api:8000",
-            "--state",
-            "/state/live.db",
-            "--api-key-file",
-            "/run/secrets/api_key",
-            "--count",
-            "3",
-            "--rate",
-            "10",
-        )
-        run(
-            "--profile",
-            "simulation",
-            "run",
-            "--rm",
-            "--no-deps",
-            "simulator",
-            "python",
-            "-c",
-            "import sqlite3; c=sqlite3.connect('/state/live.db'); "
-            "assert c.execute('SELECT count(*) FROM events WHERE delivered_at IS NOT NULL').fetchone()[0]==15; "
-            "assert c.execute('SELECT count(*) FROM events WHERE delivered_at IS NULL').fetchone()[0]==0; "
-            "print('Live simulator delivered and journaled 15 distinct transactions across container restarts')",
-        )
-        # Start the long-lived producer so Prometheus can scrape its authenticated quality metrics.
-        run("--profile", "simulation", "up", "-d", "--no-build", "--no-deps", "simulator")
-        code = """
+        try:
+            run(
+                "up",
+                "-d",
+                "--no-build",
+                "--wait",
+                "--wait-timeout",
+                "90",
+                "api",
+                "audit-store",
+                "prometheus",
+                "grafana",
+            )
+            run("--profile", "replay", "run", "--rm", "--no-deps", "traffic-generator")
+            run(
+                "--profile",
+                "simulation",
+                "run",
+                "--rm",
+                "--no-deps",
+                "simulator",
+                "python",
+                "-m",
+                "fraud_detector.simulator",
+                "stream",
+                "--seed",
+                "17",
+                "--url",
+                "http://api:8000",
+                "--state",
+                "/state/live.db",
+                "--api-key-file",
+                "/run/secrets/api_key",
+                "--count",
+                "12",
+                "--rate",
+                "10",
+            )
+            run(
+                "--profile",
+                "simulation",
+                "run",
+                "--rm",
+                "--no-deps",
+                "simulator",
+                "python",
+                "-m",
+                "fraud_detector.simulator",
+                "stream",
+                "--seed",
+                "17",
+                "--url",
+                "http://api:8000",
+                "--state",
+                "/state/live.db",
+                "--api-key-file",
+                "/run/secrets/api_key",
+                "--count",
+                "3",
+                "--rate",
+                "10",
+            )
+            run(
+                "--profile",
+                "simulation",
+                "run",
+                "--rm",
+                "--no-deps",
+                "simulator",
+                "python",
+                "-c",
+                "import sqlite3; c=sqlite3.connect('/state/live.db'); "
+                "assert c.execute('SELECT count(*) FROM events WHERE delivered_at IS NOT NULL').fetchone()[0]==15; "
+                "assert c.execute('SELECT count(*) FROM events WHERE delivered_at IS NULL').fetchone()[0]==0; "
+                "print('Live simulator delivered and journaled 15 distinct transactions across container restarts')",
+            )
+            # Start the long-lived producer so Prometheus can scrape its authenticated quality metrics.
+            run("--profile", "simulation", "up", "-d", "--no-build", "--no-deps", "simulator")
+            code = """
 import httpx,time
 from pathlib import Path
 with httpx.Client(timeout=5) as client:
@@ -250,11 +258,15 @@ with httpx.Client(timeout=5) as client:
  assert q.json()['data']['result'],q.text
  print('Authenticated quality and API metrics scraping, anonymous read-only Grafana, replay and live simulation verified')
 """
-        print(run("exec", "-T", "api", "python", "-c", code).stdout)
-        print("Isolated full Compose verification passed")
-    except Exception:
-        r = run("logs", "--tail", "20", check=False)
-        print(r.stdout, r.stderr)
-        raise
-    finally:
-        run("down", "--volumes", "--remove-orphans", check=False)
+            print(run("exec", "-T", "api", "python", "-c", code).stdout)
+            print("Isolated full Compose verification passed")
+        except Exception:
+            r = run("logs", "--tail", "20", check=False)
+            print(r.stdout, r.stderr)
+            raise
+        finally:
+            run("down", "--volumes", "--remove-orphans", check=False)
+
+
+if __name__ == "__main__":
+    main()

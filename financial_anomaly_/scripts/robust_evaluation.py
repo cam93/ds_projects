@@ -10,39 +10,16 @@ import numpy as np
 import pandas as pd
 import sklearn
 import torch
-from compare_models import assess, digest, export_parameters, threshold_at_fpr
-from prepare_dataset import build_training_features, validate_and_sort
-from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
 from threadpoolctl import threadpool_limits
-from train import as_tensor, fit_normalization, score_batches, train_model
 
+from fraud_detector.artifacts import digest
+from fraud_detector.dataset import build_training_features, validate_and_sort
 from fraud_detector.features.adaptive import V3_FEATURE_NAMES
 from fraud_detector.features.handbook import V2_FEATURE_NAMES
+from fraud_detector.model.candidates import fit_candidate
+from fraud_detector.model.evaluation import metrics, threshold_at_fpr, wilson
 from fraud_detector.model.portable import PortableModel
 from fraud_detector.simulation import SimulationConfig, TransactionWorld, parse_start
-
-
-def wilson(successes, total, z=1.96):
-    if not total:
-        return [None, None]
-    p = successes / total
-    denominator = 1 + z * z / total
-    center = (p + z * z / (2 * total)) / denominator
-    margin = z * np.sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / denominator
-    return [max(0.0, float(center - margin)), min(1.0, float(center + margin))]
-
-
-def metrics(frame, scores, threshold):
-    result = assess(frame, scores, threshold)
-    y = frame.is_fraud.to_numpy(dtype=int)
-    predicted = np.asarray(scores) >= threshold
-    fp, tp = int((predicted & (y == 0)).sum()), int((predicted & (y == 1)).sum())
-    result["fpr_95_interval"] = wilson(fp, int((y == 0).sum()))
-    result["recall_95_interval"] = wilson(tp, int(y.sum()))
-    result["precision_95_interval"] = wilson(tp, int(predicted.sum()))
-    result["false_positives_per_1000"] = result["false_positive_rate"] * 1000
-    return result
 
 
 def population(policy, seed, start="2024-01-01"):
@@ -73,65 +50,24 @@ def split_window(frame, train_end, policy):
 
 
 def fit(train, calibration, names, kind, policy):
-    means, stds = fit_normalization(train, names)
-    if kind == "hist_gradient_boosting":
-        means, stds = dict.fromkeys(names, 0.0), dict.fromkeys(names, 1.0)
-    mv, sv = [means[n] for n in names], [stds[n] for n in names]
-    x = (train[names].to_numpy(dtype=float) - mv) / sv
-    if kind == "mlp":
-        model, _, _ = train_model(
-            train,
-            calibration,
-            means,
-            stds,
-            policy["epochs"],
-            names,
-            seed=policy["seed"],
-            hidden_size=32,
-        )
-    elif kind == "logistic":
-        model = LogisticRegression(
-            class_weight="balanced", max_iter=2000, random_state=policy["seed"]
-        ).fit(x, train.is_fraud)
-    else:
-        model = HistGradientBoostingClassifier(
-            max_iter=150,
-            max_leaf_nodes=15,
-            min_samples_leaf=50,
-            learning_rate=0.08,
-            l2_regularization=1.0,
-            class_weight="balanced",
-            early_stopping=False,
-            random_state=policy["seed"],
-        ).fit(x, train.is_fraud)
+    fitted = fit_candidate(
+        train, names, kind, epochs=policy["epochs"], seed=policy["seed"], hidden_size=32
+    )
     artifact = {
         "format_version": 1,
         "feature_names": names,
         "model_type": kind,
-        "means": mv,
-        "scales": sv,
-        "parameters": export_parameters(kind, model),
+        "means": fitted.mean_vector,
+        "scales": fitted.scale_vector,
+        "parameters": fitted.parameters,
         "feedback_delay_days": policy["feedback_delay_days"],
         "threshold": 2.0,
         "model_version": "unselected",
         "release": {"approved": False},
     }
-
-    def score(frame):
-        if kind == "mlp":
-            return np.asarray(score_batches(model, as_tensor(frame, means, stds, names)[0]))
-        return model.predict_proba((frame[names].to_numpy(dtype=float) - mv) / sv)[:, 1]
-
-    native = score(calibration)
-    # Export parity must hold before threshold selection or evaluation.
-    indices = np.linspace(0, len(calibration) - 1, min(1000, len(calibration)), dtype=int)
-    portable = PortableModel(artifact)
-    exported = np.array(
-        [portable.score(row) for row in calibration.iloc[indices][names].to_dict("records")]
-    )
-    if not np.allclose(exported, native[indices], atol=1e-6, rtol=1e-5):
-        raise ValueError("Portable scoring parity failed")
-    return artifact, score, native
+    native = fitted.score(calibration)
+    fitted.verify_export(calibration, native, artifact)
+    return artifact, fitted.score, native
 
 
 def select(results, max_fpr):
@@ -384,6 +320,19 @@ def markdown(r):
         "",
     ]
     return "\n".join(lines)
+
+
+__all__ = [
+    "fit",
+    "markdown",
+    "metrics",
+    "population",
+    "run",
+    "select",
+    "split_window",
+    "validate_policy",
+    "wilson",
+]
 
 
 if __name__ == "__main__":

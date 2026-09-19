@@ -98,12 +98,7 @@ def predict(transaction: Transaction, request: Request):
         scorer = getattr(request.app.state, "scorer", None)
         if scorer is None:
             raise HTTPException(503, "Model unavailable")
-        payload = transaction.model_dump(mode="json")
-        # Preserve pre-v2 hashes exactly for existing idempotency records.
-        if transaction.adaptive_features is None:
-            payload.pop("adaptive_features", None)
-        if transaction.behavioral_features is None:
-            payload.pop("behavioral_features", None)
+        payload = transaction.idempotency_payload()
         digest = hashlib.sha256(
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()

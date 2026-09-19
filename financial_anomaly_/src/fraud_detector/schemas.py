@@ -81,6 +81,26 @@ class Transaction(BaseModel):
     behavioral_features: BehavioralFeatures | None = None
     adaptive_features: AdaptiveFeatures | None = None
 
+    def feature_values(self):
+        values = {
+            "amount": self.amount,
+            "transactions_last_hour": self.transactions_last_hour,
+            "customer_history_days": self.customer_history_days,
+            "hour_of_day": self.hour_of_day,
+        }
+        for block in (self.behavioral_features, self.adaptive_features):
+            if block is not None:
+                values.update(block.model_dump())
+        return values
+
+    def idempotency_payload(self):
+        payload = self.model_dump(mode="json")
+        # Preserve pre-feature-block hashes, including source_transaction_id=null.
+        for name in ("behavioral_features", "adaptive_features"):
+            if payload[name] is None:
+                payload.pop(name)
+        return payload
+
     @model_validator(mode="after")
     def consistent_hour(self):
         self.timestamp = self.timestamp.astimezone(timezone.utc)

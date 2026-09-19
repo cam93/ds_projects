@@ -9,9 +9,9 @@ from pathlib import Path
 from uuid import uuid4
 
 import torch
-from train import export_artifact
 
 from fraud_detector.features.handbook import FEATURE_NAMES
+from fraud_detector.model.training import export_artifact
 
 
 def docker(*args, check=True):

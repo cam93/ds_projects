@@ -83,14 +83,7 @@ class FraudScorer:
         self.model.eval()
 
     def _features(self, transaction: Transaction) -> torch.Tensor:
-        values = {
-            "amount": transaction.amount,
-            "transactions_last_hour": transaction.transactions_last_hour,
-            "customer_history_days": transaction.customer_history_days,
-            "hour_of_day": transaction.hour_of_day,
-        }
-        if transaction.behavioral_features is not None:
-            values.update(transaction.behavioral_features.model_dump())
+        values = transaction.feature_values()
         return torch.tensor(
             [[(values[name] - self.means[name]) / self.stds[name] for name in self.feature_names]],
             dtype=torch.float32,
@@ -112,12 +105,7 @@ class FraudScorer:
                 "This model requires adaptive_features with its trained feedback delay"
             )
         if self.portable is not None:
-            values = transaction.model_dump(exclude={"behavioral_features"})
-            if transaction.behavioral_features is not None:
-                values.update(transaction.behavioral_features.model_dump())
-            if transaction.adaptive_features is not None:
-                values.update(transaction.adaptive_features.model_dump())
-            probability = self.portable.score(values)
+            probability = self.portable.score(transaction.feature_values())
             return probability, probability >= self.threshold
         with torch.inference_mode():
             probability = float(torch.sigmoid(self.model(self._features(transaction))).item())

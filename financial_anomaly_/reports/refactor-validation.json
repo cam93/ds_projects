@@ -1,0 +1,31 @@
+{
+  "baseline_commit": "1241245bb79fe1d7fe1f6363118ac13fcd935e72",
+  "purpose": "Behavior-preserving refactor verification; no model promotion",
+  "comparison": {
+    "candidates": 6,
+    "exact_match": [
+      "prepared CSV and JSONL files",
+      "replay requests",
+      "test predictions",
+      "thresholds",
+      "metrics",
+      "model artifact"
+    ],
+    "excluded_fields": [
+      "training_seconds"
+    ]
+  },
+  "rolling": {
+    "epochs": 2,
+    "training_populations": 3,
+    "windows_per_population": 2,
+    "candidate_threshold_combinations": 18,
+    "exact_match": true,
+    "sha256": {
+      "selected-model.json": "e45fe33cce5a77e6c359e003950b4fa8afbab54edd610d3c2eebc5c73a4c0730",
+      "final-predictions.csv": "a85019821bb5169bbdb68b69c2edb13d331e8d1433c72a2eb3e0639b0582624e",
+      "evaluation.json": "d24779b993204aadc3c11f5f56ff887f286e7338bc7c166bcb301f08a6a1bf96",
+      "selection-before-final.json": "10dfc0ad3ab027e5115074910765e2793f214da3e9e02bbb1f1b58131066529e"
+    }
+  }
+}

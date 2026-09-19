@@ -6,7 +6,8 @@ import sqlite3
 from pathlib import Path
 
 import pandas as pd
-from train import classification_metrics
+
+from fraud_detector.model.evaluation import average_precision, classification_metrics
 
 
 def evaluate(database, labels_path, run_id, postgres_url_file=None):
@@ -64,7 +65,6 @@ def evaluate(database, labels_path, run_id, postgres_url_file=None):
         raise ValueError("Evaluation requires both classes")
     # Decisions use the actual deployed threshold; AP uses the original scores.
     metrics = classification_metrics(joined.is_fraud.tolist(), joined.predicted_fraud.tolist(), 0.5)
-    from train import average_precision
 
     metrics["average_precision"] = average_precision(
         joined.is_fraud.tolist(), joined.fraud_probability.tolist()

@@ -11,120 +11,13 @@ import numpy as np
 import pandas as pd
 import sklearn
 import torch
-from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score
 from threadpoolctl import threadpool_limits
-from train import (
-    as_tensor,
-    classification_metrics,
-    fit_normalization,
-    score_batches,
-    split_by_time,
-    train_model,
-)
 
+from fraud_detector.artifacts import digest
 from fraud_detector.features.handbook import FEATURE_NAMES, FEATURE_VERSION, V2_FEATURE_NAMES
-from fraud_detector.model.portable import PortableModel
-
-
-def digest(path):
-    value = hashlib.sha256()
-    with Path(path).open("rb") as source:
-        for block in iter(lambda: source.read(1024 * 1024), b""):
-            value.update(block)
-    return value.hexdigest()
-
-
-def threshold_at_fpr(labels, scores, max_fpr):
-    y, s = np.asarray(labels, dtype=int), np.asarray(scores, dtype=float)
-    if (
-        not 0 <= max_fpr < 1
-        or not len(y)
-        or len(y) != len(s)
-        or not np.isfinite(s).all()
-        or not np.isin(y, [0, 1]).all()
-        or not 0 < y.sum() < len(y)
-    ):
-        raise ValueError(
-            "Threshold selection needs finite aligned scores, both classes and FPR in [0,1)"
-        )
-    order = np.argsort(-s, kind="stable")
-    y, s = y[order], s[order]
-    ends = np.r_[np.flatnonzero(np.diff(s)), len(s) - 1]
-    tp = np.cumsum(y)[ends]
-    fp = ends + 1 - tp
-    eligible = np.flatnonzero(fp / (len(y) - y.sum()) <= max_fpr)
-    if not len(eligible):
-        return 2.0  # Explicit abstention: no probability can exceed this threshold.
-    # Highest recall under the cap; for equal recall minimize false positives.
-    chosen = max(eligible, key=lambda i: (tp[i], -fp[i]))
-    return float(s[ends[chosen]])
-
-
-def assess(records, scores, threshold):
-    labels = records.is_fraud.to_numpy(dtype=int)
-    result = classification_metrics(labels, scores, threshold)
-    result["roc_auc"] = float(roc_auc_score(labels, scores))
-    predicted = np.asarray(scores) >= threshold
-    scenarios = {}
-    for scenario in sorted(records.fraud_scenario.unique()):
-        selected = (records.fraud_scenario.to_numpy() == scenario) & (labels == 1)
-        total = int(selected.sum())
-        if total:
-            detected = int((predicted & selected).sum())
-            scenarios[str(int(scenario))] = {
-                "fraud_cases": total,
-                "detected": detected,
-                "missed": total - detected,
-                "recall": detected / total,
-            }
-    result["scenarios"] = scenarios
-    ranked = records[["timestamp", "transaction_id", "is_fraud"]].copy()
-    ranked["score"] = scores
-    ranked["day"] = pd.to_datetime(ranked.timestamp, utc=True).dt.date
-    daily = (
-        ranked.sort_values(["score", "transaction_id"], ascending=[False, True], kind="mergesort")
-        .groupby("day")
-        .head(100)
-    )
-    result["mean_daily_precision_at_100"] = float(daily.groupby("day").is_fraud.mean().mean())
-    return result
-
-
-def export_parameters(kind, model):
-    if kind == "logistic":
-        return {"coefficients": model.coef_[0].tolist(), "intercept": float(model.intercept_[0])}
-    if kind == "mlp":
-        return {
-            "hidden_weights": model[0].weight.detach().tolist(),
-            "hidden_bias": model[0].bias.detach().tolist(),
-            "output_weights": model[2].weight.detach()[0].tolist(),
-            "output_bias": float(model[2].bias.detach()[0]),
-        }
-    trees = []
-    # Private sklearn representation is pinned and verified against native predict_proba.
-    # Only numeric finite features are allowed: no categorical/missing-value routing.
-    for predictors in model._predictors:
-        if len(predictors) != 1:
-            raise ValueError("Only binary numeric boosting models are supported")
-        nodes = []
-        for node in predictors[0].nodes:
-            if node["is_leaf"]:
-                nodes.append({"value": float(node["value"])})
-            else:
-                if node["is_categorical"]:
-                    raise ValueError("Categorical trees are unsupported")
-                nodes.append(
-                    {
-                        "feature": int(node["feature_idx"]),
-                        "threshold": float(node["num_threshold"]),
-                        "left": int(node["left"]),
-                        "right": int(node["right"]),
-                    }
-                )
-        trees.append(nodes)
-    return {"baseline": float(model._baseline_prediction[0, 0]), "trees": trees}
+from fraud_detector.model.candidates import fit_candidate
+from fraud_detector.model.evaluation import assess, split_by_time, threshold_at_fpr
+from fraud_detector.model.export import export_parameters
 
 
 def read_features(path):
@@ -200,60 +93,19 @@ def run(input_path, output_dir, policy_path, external_input=None):
     hashes = {"input_sha256": digest(input_path), "policy_sha256": digest(policy_path)}
     with threadpool_limits(limits=1):
         for feature_version, names in (("v1", FEATURE_NAMES), ("v2", V2_FEATURE_NAMES)):
-            means, stds = fit_normalization(training, names)
-            mean_vector, scale_vector = [means[n] for n in names], [stds[n] for n in names]
             for kind in ("logistic", "hist_gradient_boosting", "mlp"):
                 key = f"{feature_version}_{kind}"
                 print(f"Training {key}", flush=True)
                 started = time.perf_counter()
-                scaled = kind != "hist_gradient_boosting"
-                model_means = mean_vector if scaled else [0.0] * len(names)
-                model_scales = scale_vector if scaled else [1.0] * len(names)
-                x = (training[names].to_numpy(dtype=float) - model_means) / model_scales
-                vx = (validation[names].to_numpy(dtype=float) - model_means) / model_scales
-                if kind == "mlp":
-                    model, _, _ = train_model(
-                        training,
-                        validation,
-                        means,
-                        stds,
-                        policy["mlp_epochs"],
-                        names,
-                        seed=policy["seed"],
-                        hidden_size=8 if feature_version == "v1" else 32,
-                    )
-                    scores = np.asarray(
-                        score_batches(model, as_tensor(validation, means, stds, names)[0])
-                    )
-                    hyperparameters = {
-                        "epochs": policy["mlp_epochs"],
-                        "hidden_size": 8 if feature_version == "v1" else 32,
-                        "batch_size": 1024,
-                        "learning_rate": 0.001,
-                        "positive_class_weight": "balanced",
-                    }
-                else:
-                    if kind == "logistic":
-                        model = LogisticRegression(
-                            C=1.0,
-                            class_weight="balanced",
-                            max_iter=2000,
-                            random_state=policy["seed"],
-                        )
-                    else:
-                        model = HistGradientBoostingClassifier(
-                            max_iter=150,
-                            max_leaf_nodes=15,
-                            min_samples_leaf=50,
-                            learning_rate=0.08,
-                            l2_regularization=1.0,
-                            class_weight="balanced",
-                            early_stopping=False,
-                            random_state=policy["seed"],
-                        )
-                    model.fit(x, training.is_fraud)
-                    scores = model.predict_proba(vx)[:, 1]
-                    hyperparameters = model.get_params()
+                fitted = fit_candidate(
+                    training,
+                    names,
+                    kind,
+                    epochs=policy["mlp_epochs"],
+                    seed=policy["seed"],
+                    hidden_size=8 if feature_version == "v1" else 32,
+                )
+                scores = fitted.score(validation)
                 threshold = threshold_at_fpr(
                     validation.is_fraud, scores, policy["max_false_positive_rate"]
                 )
@@ -262,9 +114,9 @@ def run(input_path, output_dir, policy_path, external_input=None):
                     "feature_version": 1 if feature_version == "v1" else FEATURE_VERSION,
                     "feature_names": names,
                     "model_type": kind,
-                    "means": model_means,
-                    "scales": model_scales,
-                    "parameters": export_parameters(kind, model),
+                    "means": fitted.mean_vector,
+                    "scales": fitted.scale_vector,
+                    "parameters": fitted.parameters,
                     "threshold": threshold,
                     "model_version": key + "-" + hashes["input_sha256"][:12],
                     "release": {
@@ -272,38 +124,17 @@ def run(input_path, output_dir, policy_path, external_input=None):
                         "purpose": "synthetic-demo comparison; separate production approval required",
                     },
                 }
-                scorer = PortableModel(artifact)
-                sample = validation.iloc[
-                    np.linspace(0, len(validation) - 1, min(1000, len(validation)), dtype=int)
-                ]
-                predicted = np.array(
-                    [scorer.score(row) for row in sample[names].to_dict("records")]
-                )
-                sample_indices = np.linspace(
-                    0, len(validation) - 1, min(1000, len(validation)), dtype=int
-                )
-                if not np.allclose(predicted, scores[sample_indices], rtol=1e-5, atol=1e-6):
-                    raise ValueError(f"Portable/native scoring mismatch: {key}")
+                parity_error = fitted.verify_export(validation, scores, artifact)
                 validation_results[key] = assess(validation, scores, threshold)
                 candidates[key] = {
                     "feature_count": len(names),
                     "threshold": threshold,
-                    "hyperparameters": hyperparameters,
+                    "hyperparameters": fitted.hyperparameters,
                     "training_seconds": time.perf_counter() - started,
                     "validation": validation_results[key],
-                    "portable_validation_max_abs_error": float(
-                        np.max(np.abs(predicted - scores[sample_indices]))
-                    ),
+                    "portable_validation_max_abs_error": parity_error,
                 }
-                native_models[key] = (
-                    model,
-                    names,
-                    model_means,
-                    model_scales,
-                    means,
-                    stds,
-                    artifact,
-                )
+                native_models[key] = (fitted, artifact)
         selected = choose(validation_results)
         frozen = {
             "selected": selected,
@@ -320,16 +151,11 @@ def run(input_path, output_dir, policy_path, external_input=None):
             or not 0 < external.is_fraud.sum() < len(external)
         ):
             raise ValueError("External evaluation requires distinct data with both classes")
-        for key, (model, names, mv, sv, means, stds, artifact) in native_models.items():
+        for key, (fitted, artifact) in native_models.items():
             for label, frame in (("test", test), ("external", external)):
                 if frame is None:
                     continue
-                if artifact["model_type"] == "mlp":
-                    scores = score_batches(model, as_tensor(frame, means, stds, names)[0])
-                else:
-                    scores = model.predict_proba((frame[names].to_numpy(dtype=float) - mv) / sv)[
-                        :, 1
-                    ]
+                scores = fitted.score(frame)
                 candidates[key][label] = assess(frame, scores, artifact["threshold"])
                 if label == "test":
                     pd.DataFrame(
@@ -461,6 +287,19 @@ def main():
             indent=2,
         )
     )
+
+
+__all__ = [
+    "assess",
+    "choose",
+    "digest",
+    "export_parameters",
+    "main",
+    "markdown_report",
+    "read_features",
+    "run",
+    "threshold_at_fpr",
+]
 
 
 if __name__ == "__main__":

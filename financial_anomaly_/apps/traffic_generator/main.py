@@ -5,13 +5,13 @@ import json
 import logging
 import math
 import os
-import random
 import time
 from pathlib import Path
 from uuid import uuid4
 
 import httpx
 
+from fraud_detector.delivery import post_transaction
 from fraud_detector.schemas import Transaction
 from fraud_detector.security import secret
 
@@ -48,21 +48,6 @@ def file_digest(path):
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def post_transaction(client, transaction, attempts=6, sleep=time.sleep):
-    for attempt in range(attempts):
-        try:
-            response = client.post("/predict", json=transaction)
-            if response.status_code < 400:
-                return response.json()
-            if response.status_code not in (429, 500, 502, 503, 504):
-                raise ValueError(f"Permanent replay error HTTP {response.status_code}")
-        except httpx.TransportError:
-            pass
-        if attempt + 1 < attempts:
-            sleep(min(30, 2**attempt) + random.random())
-    raise RuntimeError("Replay retry budget exhausted; checkpoint retained")
 
 
 def run_replay(data_path, checkpoint_path, client, interval=0.25, run_id=None):
@@ -104,6 +89,9 @@ def main():
             float(os.getenv("TRAFFIC_INTERVAL_SECONDS", ".25")),
             os.getenv("TRAFFIC_REPLAY_RUN_ID"),
         )
+
+
+__all__ = ["atomic_checkpoint", "main", "post_transaction", "replay_transactions", "run_replay"]
 
 
 if __name__ == "__main__":
