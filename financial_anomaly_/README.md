@@ -116,6 +116,14 @@ The reported sigmoid is a model score, not a demonstrated calibrated probability
 
 ## Configure and start the local stack
 
+The separate Handbook reproduction and model-comparison workflow is documented in
+[`reports/handbook-reference/README.md`](reports/handbook-reference/README.md).
+It implements the official 15-feature schema with 30-day history, reproduces the
+published filtered-card benchmark, and evaluates high-recall models on all
+transactions and a fresh population from the original generator. Its offline
+artifacts do not replace the API model. Install the `training` and `benchmark`
+extras to run it.
+
 ```bash
 python scripts/init_secrets.py
 cp .env.example .env

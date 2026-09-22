@@ -1,0 +1,492 @@
+{
+  "raw_commit": "6e67dbd0a3bfe0d7ec33abc4bce5f37cd4ff0d6a",
+  "reference_commit": "81cf7d1714bb7b2f5b496407d9055d91dc68dc25",
+  "reference_sha256": "d6e5ba7e94d24ff1fa729647911527a4bdfbaa9f12c5583ea5b32351fbc74979",
+  "manifest_sha256": "9ac99bb4c9732949fcf39be558f46c093ea666a77986eefefcf0d37ba1e1874b",
+  "features": [
+    "TX_AMOUNT",
+    "TX_DURING_WEEKEND",
+    "TX_DURING_NIGHT",
+    "CUSTOMER_ID_NB_TX_1DAY_WINDOW",
+    "CUSTOMER_ID_AVG_AMOUNT_1DAY_WINDOW",
+    "CUSTOMER_ID_NB_TX_7DAY_WINDOW",
+    "CUSTOMER_ID_AVG_AMOUNT_7DAY_WINDOW",
+    "CUSTOMER_ID_NB_TX_30DAY_WINDOW",
+    "CUSTOMER_ID_AVG_AMOUNT_30DAY_WINDOW",
+    "TERMINAL_ID_NB_TX_1DAY_WINDOW",
+    "TERMINAL_ID_RISK_1DAY_WINDOW",
+    "TERMINAL_ID_NB_TX_7DAY_WINDOW",
+    "TERMINAL_ID_RISK_7DAY_WINDOW",
+    "TERMINAL_ID_NB_TX_30DAY_WINDOW",
+    "TERMINAL_ID_RISK_30DAY_WINDOW"
+  ],
+  "versions": {
+    "python": "3.10.7",
+    "sklearn": "1.7.2",
+    "xgboost": "3.0.5"
+  },
+  "fresh_seed": 941,
+  "fresh_days": 112,
+  "warmup_days": 37,
+  "recall_calibration_target": 0.86,
+  "deployed": false,
+  "application_note": "All positive-amount transactions; no known-card exclusions. Same reference feature conventions. Customer windows include the current observed amount.",
+  "reference_note": "Includes zero amounts to reproduce published data; default library versions differ from the historical notebook.",
+  "reference_feature_parity": {
+    "CUSTOMER_ID": 5.229594535194337e-12,
+    "TERMINAL_ID": 0.0
+  },
+  "reference": {
+    "decision_tree_2": {
+      "official": {
+        "precision": 0.968421052631579,
+        "recall": 0.4779220779220779,
+        "average_precision": 0.4963291403295811,
+        "false_positive_rate": 0.00010366454154356503,
+        "true_positive": 184,
+        "false_positive": 6,
+        "false_negative": 201,
+        "true_negative": 57873,
+        "rows": 58264,
+        "false_negative_rate": 0.5220779220779221,
+        "roc_auc": 0.763183538070803,
+        "alerts_per_1000": 3.2610188109295617,
+        "card_precision_at_100": 0.2414285714285714
+      },
+      "all_transactions": {
+        "precision": 0.9804560260586319,
+        "recall": 0.5299295774647887,
+        "average_precision": 0.5612459454925249,
+        "false_positive_rate": 9.020928554245851e-05,
+        "true_positive": 301,
+        "false_positive": 6,
+        "false_negative": 267,
+        "true_negative": 66506,
+        "rows": 67080,
+        "false_negative_rate": 0.47007042253521125,
+        "roc_auc": 0.7926257403090664,
+        "alerts_per_1000": 4.576624925462134,
+        "card_precision_at_100": 0.3657142857142857
+      }
+    },
+    "logistic": {
+      "official": {
+        "precision": 0.9095477386934674,
+        "recall": 0.4701298701298701,
+        "average_precision": 0.6054852890605006,
+        "false_positive_rate": 0.00031099362463069506,
+        "true_positive": 181,
+        "false_positive": 18,
+        "false_negative": 204,
+        "true_negative": 57861,
+        "rows": 58264,
+        "false_negative_rate": 0.5298701298701298,
+        "roc_auc": 0.8703440204295437,
+        "alerts_per_1000": 3.4154881230262255,
+        "card_precision_at_100": 0.2914285714285714
+      },
+      "all_transactions": {
+        "precision": 0.9238095238095239,
+        "recall": 0.5123239436619719,
+        "average_precision": 0.6693967596566938,
+        "false_positive_rate": 0.00036083714216983404,
+        "true_positive": 291,
+        "false_positive": 24,
+        "false_negative": 277,
+        "true_negative": 66488,
+        "rows": 67080,
+        "false_negative_rate": 0.48767605633802813,
+        "roc_auc": 0.8979958239030043,
+        "alerts_per_1000": 4.695885509838998,
+        "card_precision_at_100": 0.41857142857142854
+      }
+    },
+    "random_forest": {
+      "official": {
+        "precision": 0.9752475247524752,
+        "recall": 0.5116883116883116,
+        "average_precision": 0.6578349057687691,
+        "false_positive_rate": 8.638711795297085e-05,
+        "true_positive": 197,
+        "false_positive": 5,
+        "false_negative": 188,
+        "true_negative": 57874,
+        "rows": 58264,
+        "false_negative_rate": 0.48831168831168836,
+        "roc_auc": 0.8673835899928264,
+        "alerts_per_1000": 3.4669778937251134,
+        "card_precision_at_100": 0.2871428571428572
+      },
+      "all_transactions": {
+        "precision": 0.9814241486068112,
+        "recall": 0.5580985915492958,
+        "average_precision": 0.7133498463034864,
+        "false_positive_rate": 9.020928554245851e-05,
+        "true_positive": 317,
+        "false_positive": 6,
+        "false_negative": 251,
+        "true_negative": 66506,
+        "rows": 67080,
+        "false_negative_rate": 0.44190140845070425,
+        "roc_auc": 0.8947845533327461,
+        "alerts_per_1000": 4.815146094215862,
+        "card_precision_at_100": 0.4271428571428571
+      }
+    },
+    "xgboost": {
+      "official": {
+        "precision": 0.9004739336492891,
+        "recall": 0.4935064935064935,
+        "average_precision": 0.5633338397217977,
+        "false_positive_rate": 0.0003628258954024776,
+        "true_positive": 190,
+        "false_positive": 21,
+        "false_negative": 195,
+        "true_negative": 57858,
+        "rows": 58264,
+        "false_negative_rate": 0.5064935064935066,
+        "roc_auc": 0.837648605476315,
+        "alerts_per_1000": 3.6214472058217764,
+        "card_precision_at_100": 0.24571428571428575
+      },
+      "all_transactions": {
+        "precision": 0.9169139465875371,
+        "recall": 0.5440140845070423,
+        "average_precision": 0.6346743048542116,
+        "false_positive_rate": 0.00042097666586480637,
+        "true_positive": 309,
+        "false_positive": 28,
+        "false_negative": 259,
+        "true_negative": 66484,
+        "rows": 67080,
+        "false_negative_rate": 0.45598591549295775,
+        "roc_auc": 0.8690014001497559,
+        "alerts_per_1000": 5.023852116875373,
+        "card_precision_at_100": 0.37
+      }
+    },
+    "hist_gradient_boosting": {
+      "official": {
+        "precision": 0.3107476635514019,
+        "recall": 0.6909090909090909,
+        "average_precision": 0.6043868521244593,
+        "false_positive_rate": 0.010193679918450561,
+        "true_positive": 266,
+        "false_positive": 590,
+        "false_negative": 119,
+        "true_negative": 57289,
+        "rows": 58264,
+        "false_negative_rate": 0.3090909090909091,
+        "roc_auc": 0.8750571220793582,
+        "alerts_per_1000": 14.691747906082659,
+        "card_precision_at_100": 0.29000000000000004
+      },
+      "all_transactions": {
+        "precision": 0.3445447087776866,
+        "recall": 0.7394366197183099,
+        "average_precision": 0.6617331495200868,
+        "false_positive_rate": 0.012012869858070725,
+        "true_positive": 420,
+        "false_positive": 799,
+        "false_negative": 148,
+        "true_negative": 65713,
+        "rows": 67080,
+        "false_negative_rate": 0.2605633802816901,
+        "roc_auc": 0.9041401271019187,
+        "alerts_per_1000": 18.17233154442457,
+        "card_precision_at_100": 0.42
+      }
+    }
+  },
+  "published_reference": {
+    "decision_tree_2": {
+      "roc_auc": 0.763,
+      "average_precision": 0.496,
+      "card_precision_at_100": 0.241
+    },
+    "random_forest": {
+      "roc_auc": 0.867,
+      "average_precision": 0.658,
+      "card_precision_at_100": 0.287
+    },
+    "xgboost": {
+      "roc_auc": 0.862,
+      "average_precision": 0.639,
+      "card_precision_at_100": 0.273
+    }
+  },
+  "rolling_windows": [
+    [
+      "2018-05-01",
+      "2018-05-29",
+      "2018-06-05",
+      "2018-06-19",
+      "2018-06-26",
+      "2018-07-10"
+    ],
+    [
+      "2018-06-01",
+      "2018-06-29",
+      "2018-07-06",
+      "2018-07-20",
+      "2018-07-27",
+      "2018-08-10"
+    ]
+  ],
+  "rolling": {
+    "hist_gradient_boosting": [
+      {
+        "threshold": 0.1728310441499308,
+        "precision": 0.0273120818575364,
+        "recall": 0.854679802955665,
+        "average_precision": 0.6775097397718058,
+        "false_positive_rate": 0.27808489412611853,
+        "true_positive": 1041,
+        "false_positive": 37074,
+        "false_negative": 177,
+        "true_negative": 96245,
+        "rows": 134537,
+        "false_negative_rate": 0.14532019704433496,
+        "roc_auc": 0.8998504592938321,
+        "alerts_per_1000": 283.3049644335759,
+        "card_precision_at_100": 0.3935714285714286
+      },
+      {
+        "threshold": 0.15246419415127244,
+        "precision": 0.024670067782807597,
+        "recall": 0.8576186511240633,
+        "average_precision": 0.6864689875711804,
+        "false_positive_rate": 0.30602567185715146,
+        "true_positive": 1030,
+        "false_positive": 40721,
+        "false_negative": 171,
+        "true_negative": 92343,
+        "rows": 134265,
+        "false_negative_rate": 0.14238134887593668,
+        "roc_auc": 0.8912760322479217,
+        "alerts_per_1000": 310.95966931069154,
+        "card_precision_at_100": 0.3807142857142857
+      }
+    ],
+    "random_forest": [
+      {
+        "threshold": 0.0,
+        "precision": 0.009053271590714822,
+        "recall": 1.0,
+        "average_precision": 0.7560761876975632,
+        "false_positive_rate": 1.0,
+        "true_positive": 1218,
+        "false_positive": 133319,
+        "false_negative": 0,
+        "true_negative": 0,
+        "rows": 134537,
+        "false_negative_rate": 0.0,
+        "roc_auc": 0.9074216796039565,
+        "alerts_per_1000": 1000.0,
+        "card_precision_at_100": 0.39142857142857146
+      },
+      {
+        "threshold": 0.0,
+        "precision": 0.008944996834618106,
+        "recall": 1.0,
+        "average_precision": 0.7429332824802002,
+        "false_positive_rate": 1.0,
+        "true_positive": 1201,
+        "false_positive": 133064,
+        "false_negative": 0,
+        "true_negative": 0,
+        "rows": 134265,
+        "false_negative_rate": 0.0,
+        "roc_auc": 0.8981826365861872,
+        "alerts_per_1000": 1000.0,
+        "card_precision_at_100": 0.37857142857142856
+      }
+    ],
+    "xgboost": [
+      {
+        "threshold": 0.0010664566652849317,
+        "precision": 0.01680632782520166,
+        "recall": 0.8809523809523809,
+        "average_precision": 0.7101398243850968,
+        "false_positive_rate": 0.47084061536615185,
+        "true_positive": 1073,
+        "false_positive": 62772,
+        "false_negative": 145,
+        "true_negative": 70547,
+        "rows": 134537,
+        "false_negative_rate": 0.11904761904761907,
+        "roc_auc": 0.883791109761048,
+        "alerts_per_1000": 474.55346856255153,
+        "card_precision_at_100": 0.3757142857142857
+      },
+      {
+        "threshold": 0.0011494877981022,
+        "precision": 0.020381458424203972,
+        "recall": 0.8559533721898418,
+        "average_precision": 0.7020344100268714,
+        "false_positive_rate": 0.37132507665484277,
+        "true_positive": 1028,
+        "false_positive": 49410,
+        "false_negative": 173,
+        "true_negative": 83654,
+        "rows": 134265,
+        "false_negative_rate": 0.1440466278101582,
+        "roc_auc": 0.8827892156894646,
+        "alerts_per_1000": 375.66007522436973,
+        "card_precision_at_100": 0.3664285714285714
+      }
+    ],
+    "hgb_unweighted": [
+      {
+        "threshold": 0.002224619188062373,
+        "precision": 0.028015522832385308,
+        "recall": 0.8653530377668309,
+        "average_precision": 0.7327388732839957,
+        "false_positive_rate": 0.2742894861197579,
+        "true_positive": 1054,
+        "false_positive": 36568,
+        "false_negative": 164,
+        "true_negative": 96751,
+        "rows": 134537,
+        "false_negative_rate": 0.13464696223316908,
+        "roc_auc": 0.9046593875836726,
+        "alerts_per_1000": 279.6405449801913,
+        "card_precision_at_100": 0.395
+      },
+      {
+        "threshold": 0.0018914412556122516,
+        "precision": 0.02266477423933292,
+        "recall": 0.8509575353871773,
+        "average_precision": 0.7313529738459548,
+        "false_positive_rate": 0.3311940119040462,
+        "true_positive": 1022,
+        "false_positive": 44070,
+        "false_negative": 179,
+        "true_negative": 88994,
+        "rows": 134265,
+        "false_negative_rate": 0.14904246461282267,
+        "roc_auc": 0.8909822268542823,
+        "alerts_per_1000": 335.84329497635275,
+        "card_precision_at_100": 0.3807142857142857
+      }
+    ],
+    "rf_regularized": [
+      {
+        "threshold": 0.002857142857142857,
+        "precision": 0.03212839081870627,
+        "recall": 0.8596059113300493,
+        "average_precision": 0.7719788774180273,
+        "false_positive_rate": 0.2365829326652615,
+        "true_positive": 1047,
+        "false_positive": 31541,
+        "false_negative": 171,
+        "true_negative": 101778,
+        "rows": 134537,
+        "false_negative_rate": 0.14039408866995073,
+        "roc_auc": 0.9054653085797856,
+        "alerts_per_1000": 242.22332889836997,
+        "card_precision_at_100": 0.3928571428571429
+      },
+      {
+        "threshold": 0.0014814814814814814,
+        "precision": 0.02290441976921402,
+        "recall": 0.8759367194004996,
+        "average_precision": 0.7593282658357915,
+        "false_positive_rate": 0.33726627788132024,
+        "true_positive": 1052,
+        "false_positive": 44878,
+        "false_negative": 149,
+        "true_negative": 88186,
+        "rows": 134265,
+        "false_negative_rate": 0.12406328059950045,
+        "roc_auc": 0.900935686297812,
+        "alerts_per_1000": 342.08468327561167,
+        "card_precision_at_100": 0.37428571428571417
+      }
+    ],
+    "xgb_regularized": [
+      {
+        "threshold": 0.0027317460626363754,
+        "precision": 0.0357081779936382,
+        "recall": 0.8571428571428571,
+        "average_precision": 0.7396129232528164,
+        "false_positive_rate": 0.21147023305005289,
+        "true_positive": 1044,
+        "false_positive": 28193,
+        "false_negative": 174,
+        "true_negative": 105126,
+        "rows": 134537,
+        "false_negative_rate": 0.1428571428571429,
+        "roc_auc": 0.9097199285130049,
+        "alerts_per_1000": 217.31568267465457,
+        "card_precision_at_100": 0.3964285714285714
+      },
+      {
+        "threshold": 0.00211306638084352,
+        "precision": 0.022537251201474685,
+        "recall": 0.855120732722731,
+        "average_precision": 0.7242181314128545,
+        "false_positive_rate": 0.33474117717789936,
+        "true_positive": 1027,
+        "false_positive": 44542,
+        "false_negative": 174,
+        "true_negative": 88522,
+        "rows": 134265,
+        "false_negative_rate": 0.14487926727726896,
+        "roc_auc": 0.8899709219450934,
+        "alerts_per_1000": 339.39597065504785,
+        "card_precision_at_100": 0.38285714285714284
+      }
+    ]
+  },
+  "selected": "xgb_regularized",
+  "diagnostic_candidate": "xgb_regularized",
+  "artifacts": {
+    "xgb_regularized": {
+      "path": "models/artifacts/handbook-reference/xgb_regularized.joblib",
+      "sha256": "c757f90818de0397c16b3f0c68a4008c6d04c16568e2e702277f8c8fb04237c9",
+      "threshold": 0.002743689576163888,
+      "offline_only": true
+    },
+    "hist_gradient_boosting": {
+      "path": "models/artifacts/handbook-reference/hist_gradient_boosting.joblib",
+      "sha256": "507a99445ee21541a39334614d135bde5c7d592098f53adac643eae602b4340a",
+      "threshold": 0.18297687815305183,
+      "offline_only": true
+    }
+  },
+  "fresh": {
+    "xgb_regularized": {
+      "precision": 0.03389609825962415,
+      "recall": 0.8528861154446178,
+      "average_precision": 0.7355964889652079,
+      "false_positive_rate": 0.21737765705891463,
+      "true_positive": 5467,
+      "false_positive": 155820,
+      "false_negative": 943,
+      "true_negative": 560997,
+      "rows": 723227,
+      "false_negative_rate": 0.1471138845553822,
+      "roc_auc": 0.904424026378689,
+      "alerts_per_1000": 223.0102028823592,
+      "card_precision_at_100": 0.2509333333333333
+    },
+    "hist_gradient_boosting": {
+      "precision": 0.03329355317957086,
+      "recall": 0.8530421216848674,
+      "average_precision": 0.7060814184013455,
+      "false_positive_rate": 0.22149028273604002,
+      "true_positive": 5468,
+      "false_positive": 158768,
+      "false_negative": 942,
+      "true_negative": 558049,
+      "rows": 723227,
+      "false_negative_rate": 0.14695787831513263,
+      "roc_auc": 0.903702017218837,
+      "alerts_per_1000": 227.08776082751336,
+      "card_precision_at_100": 0.25133333333333335
+    }
+  },
+  "fresh_rows": 723227,
+  "fresh_target_passed": true
+}

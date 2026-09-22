@@ -1,0 +1,35 @@
+{
+  "raw_commit": "6e67dbd0a3bfe0d7ec33abc4bce5f37cd4ff0d6a",
+  "reference_commit": "81cf7d1714bb7b2f5b496407d9055d91dc68dc25",
+  "reference_sha256": "d6e5ba7e94d24ff1fa729647911527a4bdfbaa9f12c5583ea5b32351fbc74979",
+  "manifest_sha256": "9ac99bb4c9732949fcf39be558f46c093ea666a77986eefefcf0d37ba1e1874b",
+  "features": [
+    "TX_AMOUNT",
+    "TX_DURING_WEEKEND",
+    "TX_DURING_NIGHT",
+    "CUSTOMER_ID_NB_TX_1DAY_WINDOW",
+    "CUSTOMER_ID_AVG_AMOUNT_1DAY_WINDOW",
+    "CUSTOMER_ID_NB_TX_7DAY_WINDOW",
+    "CUSTOMER_ID_AVG_AMOUNT_7DAY_WINDOW",
+    "CUSTOMER_ID_NB_TX_30DAY_WINDOW",
+    "CUSTOMER_ID_AVG_AMOUNT_30DAY_WINDOW",
+    "TERMINAL_ID_NB_TX_1DAY_WINDOW",
+    "TERMINAL_ID_RISK_1DAY_WINDOW",
+    "TERMINAL_ID_NB_TX_7DAY_WINDOW",
+    "TERMINAL_ID_RISK_7DAY_WINDOW",
+    "TERMINAL_ID_NB_TX_30DAY_WINDOW",
+    "TERMINAL_ID_RISK_30DAY_WINDOW"
+  ],
+  "versions": {
+    "python": "3.10.7",
+    "sklearn": "1.7.2",
+    "xgboost": "3.0.5"
+  },
+  "fresh_seed": 941,
+  "fresh_days": 112,
+  "warmup_days": 37,
+  "recall_calibration_target": 0.86,
+  "deployed": false,
+  "application_note": "All positive-amount transactions; no known-card exclusions. Same reference feature conventions. Customer windows include the current observed amount.",
+  "reference_note": "Includes zero amounts to reproduce published data; default library versions differ from the historical notebook."
+}

@@ -17,6 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 data = ["pandas>=2.2,<3", "numpy>=2,<3"]
 training = ["scikit-learn>=1.7,<1.8", "pandas>=2.2,<3", "numpy>=2,<3"]
+benchmark = ["xgboost==3.0.5"]
 dev = [
     "scikit-learn>=1.7,<1.8",
     "pandas>=2.2,<3",
@@ -29,6 +30,10 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+# Preserve the pinned upstream reference functions for numerical reproduction.
+"scripts/handbook_reference/reference.py" = ["I001", "B006"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
