@@ -4,6 +4,7 @@ import math
 
 from fraud_detector.features.adaptive import V3_FEATURE_NAMES
 from fraud_detector.features.handbook import FEATURE_NAMES, V2_FEATURE_NAMES
+from fraud_detector.features.terminal_risk import V4_FEATURE_NAMES
 
 
 def sigmoid(value):
@@ -18,6 +19,7 @@ class PortableModel:
             FEATURE_NAMES,
             V2_FEATURE_NAMES,
             V3_FEATURE_NAMES,
+            V4_FEATURE_NAMES,
         ):
             raise ValueError("Unsupported portable feature schema")
         self.kind = artifact["model_type"]

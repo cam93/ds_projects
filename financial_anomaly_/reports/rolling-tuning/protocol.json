@@ -1,0 +1,96 @@
+{
+  "fold_starts": [
+    84,
+    112,
+    140
+  ],
+  "recall_targets": [
+    0.86,
+    0.9,
+    0.95
+  ],
+  "feedback_delay_days": 7,
+  "warmup_days": 14,
+  "external_seeds": [
+    2026092101,
+    2026092102
+  ],
+  "external_start": "2026-01-01",
+  "external_policy": {
+    "days": 112,
+    "customers": 500,
+    "terminals": 50,
+    "feedback_delay_days": 7
+  },
+  "input_sha256": "f8ae2b070a7496bbb1e87c67ac77acdf9036bee3e4b5e1c310215736938c0d40",
+  "selection": "Every rolling evaluation must have recall >85%; maximize mean precision, then minimize worst alert volume. If none qualify, report failure without claiming a winner.",
+  "external_limit": "Fresh local simulator populations, not new Handbook data. This is a cross-generator stress test, not a same-distribution final benchmark.",
+  "search": [
+    {
+      "max_iter": 150,
+      "max_leaf_nodes": 15,
+      "min_samples_leaf": 50,
+      "learning_rate": 0.08,
+      "l2_regularization": 1,
+      "class_weight": "balanced",
+      "early_stopping": false,
+      "random_state": 7
+    },
+    {
+      "max_iter": 150,
+      "max_leaf_nodes": 15,
+      "min_samples_leaf": 50,
+      "learning_rate": 0.08,
+      "l2_regularization": 1,
+      "class_weight": null,
+      "early_stopping": false,
+      "random_state": 7
+    },
+    {
+      "max_iter": 250,
+      "max_leaf_nodes": 15,
+      "min_samples_leaf": 100,
+      "learning_rate": 0.05,
+      "l2_regularization": 10,
+      "class_weight": {
+        "0": 1,
+        "1": 10
+      },
+      "early_stopping": false,
+      "random_state": 7
+    },
+    {
+      "max_iter": 250,
+      "max_leaf_nodes": 7,
+      "min_samples_leaf": 100,
+      "learning_rate": 0.05,
+      "l2_regularization": 10,
+      "class_weight": null,
+      "early_stopping": false,
+      "random_state": 7
+    },
+    {
+      "max_iter": 250,
+      "max_leaf_nodes": 31,
+      "min_samples_leaf": 50,
+      "learning_rate": 0.05,
+      "l2_regularization": 10,
+      "class_weight": {
+        "0": 1,
+        "1": 10
+      },
+      "early_stopping": false,
+      "random_state": 7
+    },
+    {
+      "max_iter": 250,
+      "max_leaf_nodes": 31,
+      "min_samples_leaf": 100,
+      "learning_rate": 0.05,
+      "l2_regularization": 10,
+      "class_weight": "balanced",
+      "early_stopping": false,
+      "random_state": 7
+    }
+  ]
+}
